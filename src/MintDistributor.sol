@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-interface IDMDToken {
-    function mint(address to, uint256 amount) external;
-}
-
-interface IBTCReserveVault {
-    function totalWeightOf(address user) external view returns (uint256);
-    function totalSystemWeight() external view returns (uint256);
-}
-
-interface IEmissionScheduler {
-    function claimEmission() external returns (uint256);
-    function claimableNow() external view returns (uint256);
-}
+import "./interfaces/IDMDToken.sol";
+import "./interfaces/IBTCReserveVault.sol";
+import "./interfaces/IEmissionScheduler.sol";
 
 /**
  * @title MintDistributor
@@ -60,6 +50,9 @@ contract MintDistributor {
     
     // User claims: epochId => user => claimed
     mapping(uint256 => mapping(address => bool)) public claimed;
+
+    // epochId => total claimed so far
+    mapping(uint256 => uint256) public claimedTotal;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS

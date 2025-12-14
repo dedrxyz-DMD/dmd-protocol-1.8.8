@@ -2,11 +2,11 @@
 pragma solidity 0.8.20;
 
 import "forge-std/Test.sol";
-import "../src/DMDToken.sol";
-import "../src/BTCReserveVault.sol";
-import "../src/EmissionScheduler.sol";
-import "../src/MintDistributor.sol";
-import "../src/RedemptionEngine.sol";
+import "../../src/DMDToken.sol";
+import "../../src/BTCReserveVault.sol";
+import "../../src/EmissionScheduler.sol";
+import "../../src/MintDistributor.sol";
+import "../../src/RedemptionEngine.sol";
 
 contract MockWBTC {
     mapping(address => uint256) public balanceOf;

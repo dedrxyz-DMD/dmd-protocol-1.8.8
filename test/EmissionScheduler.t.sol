@@ -138,7 +138,7 @@ contract EmissionSchedulerTest is Test {
 
         vm.warp(block.timestamp + 1);
 
-        uint256 expectedRate = 3_600_000e18 / 365 days;
+        uint256 expectedRate = 3_600_000e18 / uint256(365 days);
         
         vm.prank(mintDistributor);
         uint256 claimed = scheduler.claimEmission();
@@ -153,7 +153,7 @@ contract EmissionSchedulerTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        uint256 expectedEmission = (3_600_000e18 * 1 days) / 365 days;
+        uint256 expectedEmission = (3_600_000e18 * 1 days) / uint256(365 days);
         
         vm.prank(mintDistributor);
         uint256 claimed = scheduler.claimEmission();
@@ -168,7 +168,7 @@ contract EmissionSchedulerTest is Test {
 
         vm.warp(block.timestamp + 7 days);
 
-        uint256 expectedEmission = (3_600_000e18 * 7 days) / 365 days;
+        uint256 expectedEmission = (3_600_000e18 * 7 days) / uint256(365 days);
         
         vm.prank(mintDistributor);
         uint256 claimed = scheduler.claimEmission();
@@ -238,7 +238,7 @@ contract EmissionSchedulerTest is Test {
         vm.prank(mintDistributor);
         uint256 claim = scheduler.claimEmission();
 
-        uint256 year2Rate = 2_700_000e18 / 365 days;
+        uint256 year2Rate = 2_700_000e18 / uint256(365 days);
         assertApproxEqAbs(claim, year2Rate, 1);
         assertEq(scheduler.getCurrentYear(), 2);
     }
@@ -308,7 +308,7 @@ contract EmissionSchedulerTest is Test {
         vm.warp(block.timestamp + 1 days);
 
         uint256 claimable = scheduler.claimableNow();
-        uint256 expected = (3_600_000e18 * 1 days) / 365 days;
+        uint256 expected = (3_600_000e18 * 1 days) / uint256(365 days);
 
         assertApproxEqAbs(claimable, expected, 1e18);
     }
@@ -350,7 +350,7 @@ contract EmissionSchedulerTest is Test {
         scheduler.startEmissions();
 
         uint256 rate = scheduler.currentEmissionRate();
-        uint256 expected = 3_600_000e18 / 365 days;
+        uint256 expected = 3_600_000e18 / uint256(365 days);
 
         assertEq(rate, expected);
     }
@@ -362,7 +362,7 @@ contract EmissionSchedulerTest is Test {
         vm.warp(block.timestamp + 365 days);
 
         uint256 rate = scheduler.currentEmissionRate();
-        uint256 expected = 2_700_000e18 / 365 days;
+        uint256 expected = 2_700_000e18 / uint256(365 days);
 
         assertEq(rate, expected);
     }
@@ -423,7 +423,7 @@ contract EmissionSchedulerTest is Test {
             totalClaimed += claimed;
         }
 
-        uint256 expected = (3_600_000e18 * 10 days) / 365 days;
+        uint256 expected = (3_600_000e18 * 10 days) / uint256(365 days);
         assertApproxEqAbs(totalClaimed, expected, 1e18);
     }
 
@@ -442,7 +442,7 @@ contract EmissionSchedulerTest is Test {
         vm.prank(mintDistributor);
         uint256 claimed = scheduler.claimEmission();
 
-        uint256 expected = (3_600_000e18 * timeElapsed) / 365 days;
+        uint256 expected = (3_600_000e18 * timeElapsed) / uint256(365 days);
         assertApproxEqAbs(claimed, expected, 1e18);
     }
 
@@ -468,7 +468,7 @@ contract EmissionSchedulerTest is Test {
         vm.warp(block.timestamp + timeElapsed);
 
         uint256 currentYear = scheduler.getCurrentYear();
-        uint256 expectedYear = timeElapsed / 365 days;
+        uint256 expectedYear = timeElapsed / uint256(365 days);
 
         assertEq(currentYear, expectedYear);
     }

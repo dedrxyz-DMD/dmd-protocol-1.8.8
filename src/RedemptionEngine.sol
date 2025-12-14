@@ -1,26 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-interface IDMDToken {
-    function burn(uint256 amount) external;
-    function balanceOf(address account) external view returns (uint256);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
-
-interface IBTCReserveVault {
-    function redeem(address user, uint256 positionId) external;
-    function getPosition(address user, uint256 positionId) 
-        external 
-        view 
-        returns (
-            uint256 amount,
-            uint256 lockMonths,
-            uint256 lockTime,
-            uint256 weight,
-            uint256 unlockTime
-        );
-    function isUnlocked(address user, uint256 positionId) external view returns (bool);
-}
+import "./interfaces/IDMDToken.sol";
+import "./interfaces/IBTCReserveVault.sol";
 
 /**
  * @title RedemptionEngine
@@ -101,7 +83,6 @@ contract RedemptionEngine {
         if (!vault.isUnlocked(msg.sender, positionId)) revert PositionLocked();
 
         // Require burn amount >= position weight
-        // (User earned DMD proportional to weight, must burn equivalent or more)
         if (dmdAmount < weight) revert InsufficientDMD();
 
         // Mark as redeemed before external calls
