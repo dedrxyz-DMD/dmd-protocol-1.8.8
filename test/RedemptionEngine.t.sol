@@ -41,6 +41,7 @@ contract MockDMDToken {
 
 contract MockBTCReserveVault {
     struct Position {
+        address btcAsset;
         uint256 amount;
         uint256 lockMonths;
         uint256 lockTime;
@@ -61,6 +62,7 @@ contract MockBTCReserveVault {
         uint256 weight
     ) external {
         positions[user][positionId] = Position({
+            btcAsset: address(1),
             amount: amount,
             lockMonths: lockMonths,
             lockTime: lockTime,
@@ -74,15 +76,15 @@ contract MockBTCReserveVault {
         external
         view
         returns (
+            address btcAsset,
             uint256 amount,
             uint256 lockMonths,
-            uint256 lockTime,
-            uint256 weight,
-            uint256 unlockTime
+            uint256 unlockTime,
+            uint256 weight
         )
     {
         Position memory pos = positions[user][positionId];
-        return (pos.amount, pos.lockMonths, pos.lockTime, pos.weight, pos.unlockTime);
+        return (pos.btcAsset, pos.amount, pos.lockMonths, pos.unlockTime, pos.weight);
     }
 
     function isUnlocked(address user, uint256 positionId) external view returns (bool) {

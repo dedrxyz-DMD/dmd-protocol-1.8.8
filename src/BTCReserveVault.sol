@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import "./BTCAssetRegistry.sol";
+
 interface IERC20Minimal {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
     function transfer(address to, uint256 amount) external returns (bool);
@@ -9,8 +11,9 @@ interface IERC20Minimal {
 
 /**
  * @title BTCReserveVault
- * @notice WBTC locking vault with duration-based weight calculation
+ * @notice Multi-asset BTC locking vault with duration-based weight calculation
  * @dev Lock duration: 1-24+ months, weight multiplier capped at 1.48x
+ * @dev Supports multiple BTC assets via BTCAssetRegistry (WBTC, cbBTC, tBTC, etc.)
  */
 contract BTCReserveVault {
     /*//////////////////////////////////////////////////////////////
@@ -21,7 +24,9 @@ contract BTCReserveVault {
     error InvalidAmount();
     error InvalidDuration();
     error PositionNotFound();
-    error LockNotExpired();
+    error PositionLocked();
+    error BTCAssetNotApproved();
+    error WrongBTCAsset();
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
@@ -35,11 +40,12 @@ contract BTCReserveVault {
                                STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    address public immutable wbtc;
+    BTCAssetRegistry public immutable assetRegistry;
     address public immutable redemptionEngine;
 
     struct Position {
-        uint256 amount;          // WBTC locked
+        address btcAsset;        // Which BTC asset is locked
+        uint256 amount;          // Amount locked
         uint256 lockMonths;      // Duration in months
         uint256 lockTime;        // Timestamp of lock
         uint256 weight;          // Calculated weight at lock time
@@ -47,14 +53,16 @@ contract BTCReserveVault {
 
     // user => positionId => Position
     mapping(address => mapping(uint256 => Position)) public positions;
-    
+
     // user => total positions count
     mapping(address => uint256) public positionCount;
 
     // user => total weight across all positions
     mapping(address => uint256) public totalWeightOf;
 
-    uint256 public totalLockedWBTC;
+    // btcAsset => total amount locked for that asset
+    mapping(address => uint256) public totalLockedByAsset;
+
     uint256 public totalSystemWeight;
 
     /*//////////////////////////////////////////////////////////////
@@ -63,6 +71,7 @@ contract BTCReserveVault {
 
     event Locked(
         address indexed user,
+        address indexed btcAsset,
         uint256 indexed positionId,
         uint256 amount,
         uint256 lockMonths,
@@ -71,6 +80,7 @@ contract BTCReserveVault {
 
     event Redeemed(
         address indexed user,
+        address indexed btcAsset,
         uint256 indexed positionId,
         uint256 amount
     );
@@ -79,11 +89,11 @@ contract BTCReserveVault {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _wbtc, address _redemptionEngine) {
-        if (_wbtc == address(0) || _redemptionEngine == address(0)) {
+    constructor(address _assetRegistry, address _redemptionEngine) {
+        if (_assetRegistry == address(0) || _redemptionEngine == address(0)) {
             revert InvalidAmount();
         }
-        wbtc = _wbtc;
+        assetRegistry = BTCAssetRegistry(_assetRegistry);
         redemptionEngine = _redemptionEngine;
     }
 
@@ -92,28 +102,28 @@ contract BTCReserveVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Lock WBTC for specified duration
-     * @param amount WBTC amount to lock
+     * @notice Lock BTC asset for specified duration
+     * @param btcAsset Address of the BTC asset to lock (must be approved in registry)
+     * @param amount Amount to lock
      * @param lockMonths Duration in months (1-24+ allowed, weight capped at 24)
+     * @return positionId The ID of the newly created position
      */
-    function lock(uint256 amount, uint256 lockMonths) external returns (uint256 positionId) {
+    function lock(address btcAsset, uint256 amount, uint256 lockMonths) external returns (uint256 positionId) {
         if (amount == 0) revert InvalidAmount();
         if (lockMonths == 0) revert InvalidDuration();
 
+        // Validate BTC asset is approved
+        if (!assetRegistry.isApprovedBTC(btcAsset)) {
+            revert BTCAssetNotApproved();
+        }
+
         // Calculate weight: 1.0 + min(lockMonths, 24) * 0.02
-        uint256 effectiveMonths = lockMonths > MAX_WEIGHT_MONTHS 
-            ? MAX_WEIGHT_MONTHS 
-            : lockMonths;
-        
-        uint256 weight = (amount * (WEIGHT_BASE + (effectiveMonths * WEIGHT_PER_MONTH))) / WEIGHT_BASE;
+        uint256 weight = calculateWeight(amount, lockMonths);
 
-        // Transfer WBTC from user
-        bool success = IERC20Minimal(wbtc).transferFrom(msg.sender, address(this), amount);
-        require(success, "WBTC_TRANSFER_FAILED");
-
-        // Create position
+        // Create position BEFORE external call (reentrancy protection)
         positionId = positionCount[msg.sender];
         positions[msg.sender][positionId] = Position({
+            btcAsset: btcAsset,
             amount: amount,
             lockMonths: lockMonths,
             lockTime: block.timestamp,
@@ -122,10 +132,14 @@ contract BTCReserveVault {
 
         positionCount[msg.sender]++;
         totalWeightOf[msg.sender] += weight;
-        totalLockedWBTC += amount;
+        totalLockedByAsset[btcAsset] += amount;
         totalSystemWeight += weight;
 
-        emit Locked(msg.sender, positionId, amount, lockMonths, weight);
+        // Transfer BTC asset from user (external call LAST - CEI pattern)
+        bool success = IERC20Minimal(btcAsset).transferFrom(msg.sender, address(this), amount);
+        require(success, "BTC_TRANSFER_FAILED");
+
+        emit Locked(msg.sender, btcAsset, positionId, amount, lockMonths, weight);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -133,9 +147,10 @@ contract BTCReserveVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Redeem WBTC from position (called by RedemptionEngine only)
+     * @notice Redeem position (backward compatibility wrapper for old single-asset interface)
      * @param user Position owner
      * @param positionId Position identifier
+     * @dev This is a compatibility function - used by RedemptionEngine
      */
     function redeem(address user, uint256 positionId) external {
         if (msg.sender != redemptionEngine) revert Unauthorized();
@@ -145,19 +160,58 @@ contract BTCReserveVault {
 
         // Check lock expiration
         uint256 unlockTime = pos.lockTime + (pos.lockMonths * 30 days);
-        if (block.timestamp < unlockTime) revert LockNotExpired();
+        if (block.timestamp < unlockTime) revert PositionLocked();
 
         // Remove position
         delete positions[user][positionId];
         totalWeightOf[user] -= pos.weight;
-        totalLockedWBTC -= pos.amount;
+        totalLockedByAsset[pos.btcAsset] -= pos.amount;
         totalSystemWeight -= pos.weight;
 
-        // Transfer WBTC to user
-        bool success = IERC20Minimal(wbtc).transfer(user, pos.amount);
-        require(success, "WBTC_TRANSFER_FAILED");
+        // Transfer BTC asset to user
+        bool success = IERC20Minimal(pos.btcAsset).transfer(user, pos.amount);
+        require(success, "BTC_TRANSFER_FAILED");
 
-        emit Redeemed(user, positionId, pos.amount);
+        emit Redeemed(user, pos.btcAsset, positionId, pos.amount);
+    }
+
+    /**
+     * @notice Release BTC from position (called by RedemptionEngine only)
+     * @param user Position owner
+     * @param positionId Position identifier
+     * @param btcAsset Expected BTC asset (safety check)
+     * @param amount Expected amount (safety check)
+     */
+    function releaseBTC(
+        address user,
+        uint256 positionId,
+        address btcAsset,
+        uint256 amount
+    ) external {
+        if (msg.sender != redemptionEngine) revert Unauthorized();
+
+        Position memory pos = positions[user][positionId];
+        if (pos.amount == 0) revert PositionNotFound();
+
+        // Safety checks
+        if (pos.btcAsset != btcAsset) revert WrongBTCAsset();
+        require(pos.amount == amount, "AMOUNT_MISMATCH");
+
+        // Check lock expiration
+        uint256 unlockTime = pos.lockTime + (pos.lockMonths * 30 days);
+        if (block.timestamp < unlockTime) revert PositionLocked();
+
+        // Remove position
+        delete positions[user][positionId];
+        totalWeightOf[user] -= pos.weight;
+        totalLockedByAsset[btcAsset] -= pos.amount;
+        totalSystemWeight -= pos.weight;
+
+        // Transfer BTC asset to user
+        bool success = IERC20Minimal(btcAsset).transfer(user, pos.amount);
+        require(success, "BTC_TRANSFER_FAILED");
+
+        emit Redeemed(user, btcAsset, positionId, pos.amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -165,59 +219,98 @@ contract BTCReserveVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Get user's total weight across all positions
-     */
-    function getUserWeight(address user) external view returns (uint256) {
-        return totalWeightOf[user];
-    }
-
-    /**
      * @notice Get specific position details
+     * @return btcAsset The BTC asset locked in this position
+     * @return amount The amount locked
+     * @return lockMonths The lock duration in months
+     * @return unlockTime The timestamp when position unlocks
+     * @return weight The weight of this position
      */
-    function getPosition(address user, uint256 positionId) 
-        external 
-        view 
+    function getPosition(address user, uint256 positionId)
+        external
+        view
         returns (
+            address btcAsset,
             uint256 amount,
             uint256 lockMonths,
-            uint256 lockTime,
-            uint256 weight,
-            uint256 unlockTime
-        ) 
+            uint256 unlockTime,
+            uint256 weight
+        )
     {
         Position memory pos = positions[user][positionId];
         return (
+            pos.btcAsset,
             pos.amount,
             pos.lockMonths,
-            pos.lockTime,
-            pos.weight,
-            pos.lockTime + (pos.lockMonths * 30 days)
+            pos.lockTime + (pos.lockMonths * 30 days),
+            pos.weight
         );
     }
 
     /**
      * @notice Check if position is unlocked
      */
-    function isUnlocked(address user, uint256 positionId) external view returns (bool) {
+    function isPositionUnlocked(address user, uint256 positionId) external view returns (bool) {
         Position memory pos = positions[user][positionId];
         if (pos.amount == 0) return false;
-        
+
         uint256 unlockTime = pos.lockTime + (pos.lockMonths * 30 days);
         return block.timestamp >= unlockTime;
     }
 
     /**
+     * @notice Get total locked amount for a specific BTC asset
+     */
+    function getTotalLockedByAsset(address btcAsset) external view returns (uint256) {
+        return totalLockedByAsset[btcAsset];
+    }
+
+    /**
+     * @notice Get total locked WBTC across all positions (backward compatibility)
+     * @dev Returns sum of all BTC assets - use with caution as different assets may exist
+     */
+    function totalLockedWBTC() external view returns (uint256) {
+        // This is a compatibility function - in multi-asset context,
+        // you should use getTotalLockedByAsset() instead
+        // For now, we'll need to query the registry for all assets
+        BTCAssetRegistry.BTCAsset[] memory assets = assetRegistry.getActiveBTCAssets();
+        uint256 total = 0;
+        for (uint256 i = 0; i < assets.length; i++) {
+            total += totalLockedByAsset[assets[i].tokenAddress];
+        }
+        return total;
+    }
+
+    /**
+     * @notice Get number of positions for a user
+     */
+    function getUserPositionCount(address user) external view returns (uint256) {
+        return positionCount[user];
+    }
+
+    /**
      * @notice Calculate weight for given amount and duration (preview)
      */
-    function calculateWeight(uint256 amount, uint256 lockMonths) 
-        external 
-        pure 
-        returns (uint256) 
+    function calculateWeight(uint256 amount, uint256 lockMonths)
+        public
+        pure
+        returns (uint256)
     {
-        uint256 effectiveMonths = lockMonths > MAX_WEIGHT_MONTHS 
-            ? MAX_WEIGHT_MONTHS 
+        uint256 effectiveMonths = lockMonths > MAX_WEIGHT_MONTHS
+            ? MAX_WEIGHT_MONTHS
             : lockMonths;
-        
+
         return (amount * (WEIGHT_BASE + (effectiveMonths * WEIGHT_PER_MONTH))) / WEIGHT_BASE;
+    }
+
+    /**
+     * @notice Backward compatible wrapper for isUnlocked (old interface)
+     */
+    function isUnlocked(address user, uint256 positionId) external view returns (bool) {
+        Position memory pos = positions[user][positionId];
+        if (pos.amount == 0) return false;
+
+        uint256 unlockTime = pos.lockTime + (pos.lockMonths * 30 days);
+        return block.timestamp >= unlockTime;
     }
 }
