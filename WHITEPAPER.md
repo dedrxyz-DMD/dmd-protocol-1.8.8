@@ -10,13 +10,13 @@
 
 # EXECUTIVE SUMMARY
 
-DMD Protocol is a decentralized, immutable protocol for locking tBTC (Threshold Network Bitcoin) on Base Layer 2 to earn DMD token emissions. The protocol features robust flash loan protection, time-weighted rewards, and a deflationary token model with an 18% annual emission decay.
+DMD Protocol is a decentralized, immutable protocol for locking tBTC (Threshold Network Bitcoin) on Base Layer 2 to earn DMD token emissions. The protocol features robust flash loan protection, time-weighted rewards, and a deflationary token model with an 25% annual emission decay.
 
 **Key Highlights:**
 - **Single-Asset Focus**: Only accepts tBTC on Base mainnet
 - **Truly Immutable**: No governance, no upgrades, no owner controls
 - **Maximum Security**: 10-day flash loan protection, A+ security rating
-- **Deflationary Economics**: 18M max supply with 18% annual decay
+- **Deflationary Economics**: 18M max supply with 25% annual decay
 - **Battle-Tested**: 100% test coverage (160 tests passing)
 
 **Target Users:**
@@ -150,7 +150,7 @@ Lock duration multipliers incentivize long-term commitment:
             v
     ┌─────────────────────────────────────────┐
     │       EmissionScheduler.sol             │
-    │  - 18% annual decay                     │
+    │  - 25% annual decay                     │
     │  - 18M max supply cap                   │
     │  - Weekly emission calculation          │
     └─────────────────────────────────────────┘
@@ -275,7 +275,7 @@ User must burn DMD ≥ position weight to unlock tBTC
 
 **Total Supply**: 18,000,000 DMD (capped)
 **Initial Circulation**: 0 DMD (fair launch)
-**Emission Model**: Deflationary decay (18% annual)
+**Emission Model**: Deflationary decay (25% annual)
 
 ## 4.2 Token Distribution
 
@@ -304,7 +304,7 @@ Year 5:    370,740 DMD/week
 
 **Key Properties**:
 - Starts high to attract early adopters
-- Decreases 18% annually
+- Decreases 25% annually
 - Reaches cap around year 8-10
 - No emissions after cap
 
@@ -510,7 +510,7 @@ uint256 public constant EPOCH_DELAY = 7 days;
 
 // EmissionScheduler
 uint256 public constant INITIAL_WEEKLY_EMISSION = 1_000_000e18;
-uint256 public constant DECAY_RATE = 18; // 18% annual
+uint256 public constant DECAY_RATE = 18; // 25% annual
 uint256 public constant MAX_SUPPLY = 18_000_000e18;
 uint256 public constant SECONDS_PER_YEAR = 365.25 days;
 
@@ -576,7 +576,7 @@ function getYearEmission(uint256 year) public pure returns (uint256) {
     uint256 emission = INITIAL_WEEKLY_EMISSION * 52;
 
     for (uint256 i = 0; i < year; i++) {
-        emission = (emission * 82) / 100; // 18% decay
+        emission = (emission * 82) / 100; // 25% decay
     }
 
     return emission;
@@ -1045,7 +1045,7 @@ DMD Protocol represents a new paradigm in Bitcoin DeFi:
 1. Single-asset simplicity (tBTC only)
 2. Time-weighted rewards (up to 1.48x multiplier)
 3. Flash loan resistance (10-day vesting)
-4. Deflationary emissions (18% annual decay)
+4. Deflationary emissions (25% annual decay)
 5. Permanent immutability (no governance)
 
 ## 11.2 Vision
