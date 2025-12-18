@@ -6,9 +6,14 @@ import "./interfaces/IBTCReserveVault.sol";
 import "./interfaces/IEmissionScheduler.sol";
 
 /// @title MintDistributor - Distributes DMD emissions by BTC lock weight
-/// @dev Fully decentralized, epoch-based, uses vested weights consistently
-/// @dev Supports epoch skip protection - can catch up on missed epochs
+/// @author DMD Protocol Team
+/// @notice Epoch-based distribution of DMD tokens proportional to tBTC lock weight
+/// @dev Fully decentralized, uses vested weights consistently, supports epoch catch-up
 contract MintDistributor {
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
     error AlreadyClaimed();
     error NoWeight();
     error NoEmissionsAvailable();
@@ -17,29 +22,73 @@ contract MintDistributor {
     error InvalidEpoch();
     error InvalidAddress();
 
+    /*//////////////////////////////////////////////////////////////
+                                CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Duration of each epoch (7 days)
     uint256 public constant EPOCH_DURATION = 7 days;
 
+    /*//////////////////////////////////////////////////////////////
+                                IMMUTABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice DMD token contract
     IDMDToken public immutable dmdToken;
+    /// @notice BTC Reserve Vault contract
     IBTCReserveVault public immutable vault;
+    /// @notice Emission Scheduler contract
     IEmissionScheduler public immutable scheduler;
+    /// @notice Timestamp when distribution started
     uint256 public immutable distributionStartTime;
 
-    // Track next epoch to finalize (supports catching up on missed epochs)
-    uint256 public nextEpochToFinalize;
+    /*//////////////////////////////////////////////////////////////
+                                 STRUCTS
+    //////////////////////////////////////////////////////////////*/
 
+    /// @notice Data for each epoch
+    /// @param totalEmission Total DMD emitted this epoch
+    /// @param snapshotWeight Total vested weight at finalization
+    /// @param finalized Whether epoch has been finalized
     struct EpochData {
         uint256 totalEmission;
-        uint256 snapshotWeight; // Now uses vested weight for consistency
+        uint256 snapshotWeight;
         bool finalized;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                 STORAGE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Next epoch ID to finalize (enables sequential catch-up)
+    uint256 public nextEpochToFinalize;
+
+    /// @notice Epoch data by epoch ID
     mapping(uint256 => EpochData) public epochs;
+    /// @notice User weight snapshots: epochId => user => weight
     mapping(uint256 => mapping(address => uint256)) public userWeightSnapshot;
+    /// @notice Claim status: epochId => user => claimed
     mapping(uint256 => mapping(address => bool)) public claimed;
 
-    event EpochFinalized(uint256 indexed epochId, uint256 totalEmission, uint256 snapshotWeight);
-    event Claimed(address indexed user, uint256 indexed epochId, uint256 amount);
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
 
+    /// @notice Emitted when an epoch is finalized
+    event EpochFinalized(uint256 indexed epochId, uint256 totalEmission, uint256 snapshotWeight);
+    /// @notice Emitted when user claims DMD for an epoch
+    event Claimed(address indexed user, uint256 indexed epochId, uint256 amount);
+    /// @notice Emitted when user weight is snapshotted
+    event WeightSnapshotted(uint256 indexed epochId, address indexed user, uint256 weight);
+
+    /*//////////////////////////////////////////////////////////////
+                              CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Initialize distributor with required contracts
+    /// @param _dmdToken DMD token address
+    /// @param _vault BTC Reserve Vault address
+    /// @param _scheduler Emission Scheduler address
     constructor(IDMDToken _dmdToken, IBTCReserveVault _vault, IEmissionScheduler _scheduler) {
         if (address(_dmdToken) == address(0) || address(_vault) == address(0) || address(_scheduler) == address(0)) {
             revert InvalidAddress();
@@ -48,29 +97,25 @@ contract MintDistributor {
         vault = _vault;
         scheduler = _scheduler;
         distributionStartTime = block.timestamp;
-        nextEpochToFinalize = 0;
     }
 
-    /// @notice Finalize the next pending epoch (supports catching up on missed epochs)
+    /*//////////////////////////////////////////////////////////////
+                            EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Finalize the next pending epoch
     /// @dev Uses getTotalVestedWeight() for consistent weight calculation
+    /// @dev Permissionless - anyone can call
     function finalizeEpoch() external {
         uint256 currentEpoch = getCurrentEpoch();
-
-        // Must have at least one completable epoch
         if (currentEpoch == 0) revert InvalidEpoch();
-
-        // Can only finalize epochs that have ended
         if (nextEpochToFinalize >= currentEpoch) revert InvalidEpoch();
 
         uint256 epochToFinalize = nextEpochToFinalize;
-
-        // Claim emissions from scheduler
         uint256 emission = scheduler.claimEmission();
         if (emission == 0) revert NoEmissionsAvailable();
 
-        // Use VESTED weight for consistent calculation (fixes weight inconsistency issue)
         uint256 vestedWeight = vault.getTotalVestedWeight();
-
         epochs[epochToFinalize] = EpochData(emission, vestedWeight, true);
         nextEpochToFinalize = epochToFinalize + 1;
 
@@ -78,11 +123,10 @@ contract MintDistributor {
     }
 
     /// @notice Finalize multiple epochs at once (catch up on missed epochs)
-    /// @param count Number of epochs to finalize
+    /// @param count Maximum number of epochs to finalize
     function finalizeMultipleEpochs(uint256 count) external {
         uint256 currentEpoch = getCurrentEpoch();
-
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i = 0; i < count;) {
             if (nextEpochToFinalize >= currentEpoch) break;
 
             uint256 emission = scheduler.claimEmission();
@@ -93,29 +137,31 @@ contract MintDistributor {
 
             emit EpochFinalized(nextEpochToFinalize, emission, vestedWeight);
             nextEpochToFinalize++;
+            unchecked { ++i; }
         }
     }
 
-    /// @notice Get number of epochs pending finalization
-    function getPendingEpochCount() external view returns (uint256) {
-        uint256 current = getCurrentEpoch();
-        return current > nextEpochToFinalize ? current - nextEpochToFinalize : 0;
-    }
-
+    /// @notice Snapshot user's current weight for an epoch
+    /// @param epochId Epoch to snapshot for
+    /// @param user User address to snapshot
     function snapshotUserWeight(uint256 epochId, address user) external {
         if (!epochs[epochId].finalized) revert EpochNotFinalized();
         if (userWeightSnapshot[epochId][user] == 0) {
             uint256 weight = vault.getVestedWeight(user);
-            if (weight > 0) userWeightSnapshot[epochId][user] = weight;
+            if (weight > 0) {
+                userWeightSnapshot[epochId][user] = weight;
+                emit WeightSnapshotted(epochId, user, weight);
+            }
         }
     }
 
+    /// @notice Claim DMD for a single epoch
+    /// @param epochId Epoch to claim from
     function claim(uint256 epochId) external {
-        EpochData memory epoch = epochs[epochId];
+        EpochData storage epoch = epochs[epochId];
         if (!epoch.finalized) revert EpochNotFinalized();
         if (claimed[epochId][msg.sender]) revert AlreadyClaimed();
 
-        // Use vested weight (consistent with snapshot)
         uint256 userWeight = userWeightSnapshot[epochId][msg.sender];
         if (userWeight == 0) userWeight = vault.getVestedWeight(msg.sender);
         if (userWeight == 0 || epoch.snapshotWeight == 0) revert NoWeight();
@@ -127,28 +173,55 @@ contract MintDistributor {
         emit Claimed(msg.sender, epochId, share);
     }
 
+    /// @notice Claim DMD for multiple epochs at once
+    /// @param epochIds Array of epoch IDs to claim from
     function claimMultiple(uint256[] calldata epochIds) external {
-        for (uint256 i = 0; i < epochIds.length; i++) {
+        uint256 len = epochIds.length;
+        for (uint256 i = 0; i < len;) {
             uint256 epochId = epochIds[i];
-            EpochData memory epoch = epochs[epochId];
+            EpochData storage epoch = epochs[epochId];
 
-            if (!epoch.finalized || claimed[epochId][msg.sender] || epoch.snapshotWeight == 0) continue;
+            if (!epoch.finalized || claimed[epochId][msg.sender] || epoch.snapshotWeight == 0) {
+                unchecked { ++i; }
+                continue;
+            }
 
             uint256 userWeight = userWeightSnapshot[epochId][msg.sender];
             if (userWeight == 0) userWeight = vault.getVestedWeight(msg.sender);
-            if (userWeight == 0) continue;
+            if (userWeight == 0) {
+                unchecked { ++i; }
+                continue;
+            }
 
             claimed[epochId][msg.sender] = true;
             uint256 share = (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
             dmdToken.mint(msg.sender, share);
             emit Claimed(msg.sender, epochId, share);
+            unchecked { ++i; }
         }
     }
 
+    /*//////////////////////////////////////////////////////////////
+                             VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Get current epoch number
+    /// @return Current epoch (0-indexed)
     function getCurrentEpoch() public view returns (uint256) {
         return (block.timestamp - distributionStartTime) / EPOCH_DURATION;
     }
 
+    /// @notice Get number of epochs pending finalization
+    /// @return Number of epochs that can be finalized
+    function getPendingEpochCount() external view returns (uint256) {
+        uint256 current = getCurrentEpoch();
+        return current > nextEpochToFinalize ? current - nextEpochToFinalize : 0;
+    }
+
+    /// @notice Get claimable DMD amount for user in epoch
+    /// @param user User address
+    /// @param epochId Epoch to check
+    /// @return Claimable DMD amount
     function getClaimableAmount(address user, uint256 epochId) external view returns (uint256) {
         EpochData memory epoch = epochs[epochId];
         if (!epoch.finalized || claimed[epochId][user] || epoch.snapshotWeight == 0) return 0;
@@ -160,17 +233,34 @@ contract MintDistributor {
         return (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
     }
 
-    function hasClaimed(address user, uint256 epochId) external view returns (bool) { return claimed[epochId][user]; }
+    /// @notice Check if user has claimed for epoch
+    /// @param user User address
+    /// @param epochId Epoch to check
+    /// @return True if claimed
+    function hasClaimed(address user, uint256 epochId) external view returns (bool) {
+        return claimed[epochId][user];
+    }
 
-    function getEpochData(uint256 epochId) external view returns (uint256, uint256, bool) {
+    /// @notice Get epoch data
+    /// @param epochId Epoch to query
+    /// @return totalEmission Total emission for epoch
+    /// @return snapshotWeight Total weight snapshot
+    /// @return finalized Whether epoch is finalized
+    function getEpochData(uint256 epochId) external view returns (uint256 totalEmission, uint256 snapshotWeight, bool finalized) {
         EpochData memory e = epochs[epochId];
         return (e.totalEmission, e.snapshotWeight, e.finalized);
     }
 
+    /// @notice Get seconds until next epoch starts
+    /// @return Seconds remaining (0 if epoch already started)
     function timeUntilNextEpoch() external view returns (uint256) {
         uint256 nextStart = distributionStartTime + ((getCurrentEpoch() + 1) * EPOCH_DURATION);
         return block.timestamp >= nextStart ? 0 : nextStart - block.timestamp;
     }
 
-    function getNextEpochToFinalize() external view returns (uint256) { return nextEpochToFinalize; }
+    /// @notice Get next epoch ID to be finalized
+    /// @return Next epoch to finalize
+    function getNextEpochToFinalize() external view returns (uint256) {
+        return nextEpochToFinalize;
+    }
 }
