@@ -6,12 +6,15 @@ import "./interfaces/IBTCReserveVault.sol";
 import "./interfaces/IEmissionScheduler.sol";
 
 /// @title MintDistributor - Distributes DMD emissions by BTC lock weight
-/// @dev Fully decentralized, epoch-based, uses vested weights for flash loan protection
+/// @dev Fully decentralized, epoch-based, uses vested weights consistently
+/// @dev Supports epoch skip protection - can catch up on missed epochs
 contract MintDistributor {
     error AlreadyClaimed();
     error NoWeight();
     error NoEmissionsAvailable();
     error EpochNotFinalized();
+    error EpochAlreadyFinalized();
+    error InvalidEpoch();
     error InvalidAddress();
 
     uint256 public constant EPOCH_DURATION = 7 days;
@@ -21,11 +24,12 @@ contract MintDistributor {
     IEmissionScheduler public immutable scheduler;
     uint256 public immutable distributionStartTime;
 
-    uint256 public lastClaimEpoch;
+    // Track next epoch to finalize (supports catching up on missed epochs)
+    uint256 public nextEpochToFinalize;
 
     struct EpochData {
         uint256 totalEmission;
-        uint256 snapshotWeight;
+        uint256 snapshotWeight; // Now uses vested weight for consistency
         bool finalized;
     }
 
@@ -44,22 +48,58 @@ contract MintDistributor {
         vault = _vault;
         scheduler = _scheduler;
         distributionStartTime = block.timestamp;
+        nextEpochToFinalize = 0;
     }
 
+    /// @notice Finalize the next pending epoch (supports catching up on missed epochs)
+    /// @dev Uses getTotalVestedWeight() for consistent weight calculation
     function finalizeEpoch() external {
         uint256 currentEpoch = getCurrentEpoch();
-        if (currentEpoch == 0) revert EpochNotFinalized();
 
-        uint256 epochToFinalize = currentEpoch - 1;
-        if (epochs[epochToFinalize].finalized) revert EpochNotFinalized();
+        // Must have at least one completable epoch
+        if (currentEpoch == 0) revert InvalidEpoch();
 
+        // Can only finalize epochs that have ended
+        if (nextEpochToFinalize >= currentEpoch) revert InvalidEpoch();
+
+        uint256 epochToFinalize = nextEpochToFinalize;
+
+        // Claim emissions from scheduler
         uint256 emission = scheduler.claimEmission();
         if (emission == 0) revert NoEmissionsAvailable();
 
-        epochs[epochToFinalize] = EpochData(emission, vault.totalSystemWeight(), true);
-        lastClaimEpoch = epochToFinalize;
+        // Use VESTED weight for consistent calculation (fixes weight inconsistency issue)
+        uint256 vestedWeight = vault.getTotalVestedWeight();
 
-        emit EpochFinalized(epochToFinalize, emission, vault.totalSystemWeight());
+        epochs[epochToFinalize] = EpochData(emission, vestedWeight, true);
+        nextEpochToFinalize = epochToFinalize + 1;
+
+        emit EpochFinalized(epochToFinalize, emission, vestedWeight);
+    }
+
+    /// @notice Finalize multiple epochs at once (catch up on missed epochs)
+    /// @param count Number of epochs to finalize
+    function finalizeMultipleEpochs(uint256 count) external {
+        uint256 currentEpoch = getCurrentEpoch();
+
+        for (uint256 i = 0; i < count; i++) {
+            if (nextEpochToFinalize >= currentEpoch) break;
+
+            uint256 emission = scheduler.claimEmission();
+            if (emission == 0) break;
+
+            uint256 vestedWeight = vault.getTotalVestedWeight();
+            epochs[nextEpochToFinalize] = EpochData(emission, vestedWeight, true);
+
+            emit EpochFinalized(nextEpochToFinalize, emission, vestedWeight);
+            nextEpochToFinalize++;
+        }
+    }
+
+    /// @notice Get number of epochs pending finalization
+    function getPendingEpochCount() external view returns (uint256) {
+        uint256 current = getCurrentEpoch();
+        return current > nextEpochToFinalize ? current - nextEpochToFinalize : 0;
     }
 
     function snapshotUserWeight(uint256 epochId, address user) external {
@@ -75,6 +115,7 @@ contract MintDistributor {
         if (!epoch.finalized) revert EpochNotFinalized();
         if (claimed[epochId][msg.sender]) revert AlreadyClaimed();
 
+        // Use vested weight (consistent with snapshot)
         uint256 userWeight = userWeightSnapshot[epochId][msg.sender];
         if (userWeight == 0) userWeight = vault.getVestedWeight(msg.sender);
         if (userWeight == 0 || epoch.snapshotWeight == 0) revert NoWeight();
@@ -130,4 +171,6 @@ contract MintDistributor {
         uint256 nextStart = distributionStartTime + ((getCurrentEpoch() + 1) * EPOCH_DURATION);
         return block.timestamp >= nextStart ? 0 : nextStart - block.timestamp;
     }
+
+    function getNextEpochToFinalize() external view returns (uint256) { return nextEpochToFinalize; }
 }

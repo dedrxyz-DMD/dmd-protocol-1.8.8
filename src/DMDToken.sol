@@ -2,7 +2,8 @@
 pragma solidity 0.8.20;
 
 /// @title DMDToken - Extreme Deflationary Digital Asset
-/// @dev Mint-only via distributor, public burn, 18M max supply
+/// @dev Dual minter: MintDistributor (emissions) + VestingContract (team allocation)
+/// @dev Public burn, 18M max supply, fully decentralized
 contract DMDToken {
     error Unauthorized();
     error ExceedsMaxSupply();
@@ -16,6 +17,7 @@ contract DMDToken {
     uint256 public constant MAX_SUPPLY = 18_000_000e18;
 
     address public immutable mintDistributor;
+    address public immutable vestingContract;
     uint256 public totalMinted;
     uint256 public totalBurned;
 
@@ -25,15 +27,16 @@ contract DMDToken {
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    constructor(address _mintDistributor) {
-        if (_mintDistributor == address(0)) revert InvalidRecipient();
+    constructor(address _mintDistributor, address _vestingContract) {
+        if (_mintDistributor == address(0) || _vestingContract == address(0)) revert InvalidRecipient();
         mintDistributor = _mintDistributor;
+        vestingContract = _vestingContract;
     }
 
     function totalSupply() public view returns (uint256) { return totalMinted - totalBurned; }
 
     function mint(address to, uint256 amount) external {
-        if (msg.sender != mintDistributor) revert Unauthorized();
+        if (msg.sender != mintDistributor && msg.sender != vestingContract) revert Unauthorized();
         if (to == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
         if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();

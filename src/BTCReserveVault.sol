@@ -8,6 +8,7 @@ interface IERC20 {
 
 /// @title BTCReserveVault - tBTC locking vault with duration-based weight
 /// @dev Fully decentralized, tBTC-only on Base chain, flash loan protected
+/// @dev Tracks all users for accurate vested weight calculation
 contract BTCReserveVault {
     error InvalidAmount();
     error InvalidDuration();
@@ -34,8 +35,15 @@ contract BTCReserveVault {
     mapping(address => mapping(uint256 => Position)) public positions;
     mapping(address => uint256) public positionCount;
     mapping(address => uint256) public totalWeightOf;
+    mapping(address => uint256[]) internal activePositions; // Track active position IDs
+    mapping(address => mapping(uint256 => uint256)) internal positionIndex; // positionId => index in activePositions
+
     uint256 public totalLocked;
     uint256 public totalSystemWeight;
+
+    // User tracking for total vested weight calculation
+    address[] public allUsers;
+    mapping(address => bool) public isUser;
 
     event Locked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockMonths, uint256 weight);
     event Redeemed(address indexed user, uint256 indexed positionId, uint256 amount);
@@ -50,6 +58,12 @@ contract BTCReserveVault {
         if (amount == 0) revert InvalidAmount();
         if (lockMonths == 0) revert InvalidDuration();
 
+        // Track new user
+        if (!isUser[msg.sender]) {
+            isUser[msg.sender] = true;
+            allUsers.push(msg.sender);
+        }
+
         uint256 weight = calculateWeight(amount, lockMonths);
         positionId = positionCount[msg.sender];
 
@@ -58,6 +72,10 @@ contract BTCReserveVault {
         totalWeightOf[msg.sender] += weight;
         totalLocked += amount;
         totalSystemWeight += weight;
+
+        // Track active position
+        positionIndex[msg.sender][positionId] = activePositions[msg.sender].length;
+        activePositions[msg.sender].push(positionId);
 
         require(IERC20(TBTC).transferFrom(msg.sender, address(this), amount), "TRANSFER_FAILED");
         emit Locked(msg.sender, positionId, amount, lockMonths, weight);
@@ -75,6 +93,17 @@ contract BTCReserveVault {
         totalLocked -= pos.amount;
         totalSystemWeight -= pos.weight;
 
+        // Remove from active positions (swap and pop)
+        uint256 index = positionIndex[user][positionId];
+        uint256 lastIndex = activePositions[user].length - 1;
+        if (index != lastIndex) {
+            uint256 lastPositionId = activePositions[user][lastIndex];
+            activePositions[user][index] = lastPositionId;
+            positionIndex[user][lastPositionId] = index;
+        }
+        activePositions[user].pop();
+        delete positionIndex[user][positionId];
+
         require(IERC20(TBTC).transfer(user, pos.amount), "TRANSFER_FAILED");
         emit Redeemed(user, positionId, pos.amount);
     }
@@ -90,11 +119,26 @@ contract BTCReserveVault {
         return (pos.weight * (elapsed - WEIGHT_WARMUP_PERIOD)) / WEIGHT_VESTING_PERIOD;
     }
 
+    /// @notice Get vested weight for a user (only iterates active positions - gas efficient)
     function getVestedWeight(address user) external view returns (uint256) {
         uint256 total = 0;
-        uint256 count = positionCount[user];
-        for (uint256 i = 0; i < count; i++) {
-            total += getPositionVestedWeight(user, i);
+        uint256[] memory active = activePositions[user];
+        for (uint256 i = 0; i < active.length; i++) {
+            total += getPositionVestedWeight(user, active[i]);
+        }
+        return total;
+    }
+
+    /// @notice Get total vested weight across ALL users (for accurate epoch snapshots)
+    /// @dev Gas intensive - only call from view functions or when necessary
+    function getTotalVestedWeight() external view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < allUsers.length; i++) {
+            address user = allUsers[i];
+            uint256[] memory active = activePositions[user];
+            for (uint256 j = 0; j < active.length; j++) {
+                total += getPositionVestedWeight(user, active[j]);
+            }
         }
         return total;
     }
@@ -121,4 +165,7 @@ contract BTCReserveVault {
 
     function getTotalLocked() external view returns (uint256) { return totalLocked; }
     function getUserPositionCount(address user) external view returns (uint256) { return positionCount[user]; }
+    function getActivePositionCount(address user) external view returns (uint256) { return activePositions[user].length; }
+    function getActivePositions(address user) external view returns (uint256[] memory) { return activePositions[user]; }
+    function getTotalUsers() external view returns (uint256) { return allUsers.length; }
 }

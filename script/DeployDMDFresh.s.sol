@@ -80,15 +80,17 @@ contract DeployDMDFresh is Script {
         tbtc = new MockTBTC();
         console.log("MockTBTC:", address(tbtc));
 
-        // Compute addresses
+        // Compute addresses for circular dependencies
+        // Order: Vault, Scheduler, Distributor, Token, Redemption, Vesting
         uint256 nonce = vm.getNonce(deployer);
         address pVault = vm.computeCreateAddress(deployer, nonce);
         address pScheduler = vm.computeCreateAddress(deployer, nonce + 1);
         address pDistributor = vm.computeCreateAddress(deployer, nonce + 2);
         address pToken = vm.computeCreateAddress(deployer, nonce + 3);
         address pRedemption = vm.computeCreateAddress(deployer, nonce + 4);
+        address pVesting = vm.computeCreateAddress(deployer, nonce + 5);
 
-        // Deploy all contracts
+        // Deploy contracts in order
         vault = new BTCReserveVault(address(tbtc), pRedemption);
         require(address(vault) == pVault, "Vault mismatch");
 
@@ -98,17 +100,20 @@ contract DeployDMDFresh is Script {
         distributor = new MintDistributor(IDMDToken(pToken), IBTCReserveVault(address(vault)), IEmissionScheduler(address(scheduler)));
         require(address(distributor) == pDistributor, "Distributor mismatch");
 
-        dmdToken = new DMDToken(address(distributor));
+        // DMDToken now takes both distributor and vesting addresses
+        dmdToken = new DMDToken(address(distributor), pVesting);
         require(address(dmdToken) == pToken, "Token mismatch");
 
         redemption = new RedemptionEngine(IDMDToken(address(dmdToken)), IBTCReserveVault(address(vault)));
         require(address(redemption) == pRedemption, "Redemption mismatch");
 
+        // VestingContract - can now mint directly (no external funding needed)
         address[] memory bens = new address[](1);
         uint256[] memory allocs = new uint256[](1);
         bens[0] = deployer;
-        allocs[0] = 3_600_000e18;
+        allocs[0] = 3_600_000e18; // 3.6M DMD for team (20% of max supply)
         vesting = new VestingContract(IDMDToken(address(dmdToken)), bens, allocs);
+        require(address(vesting) == pVesting, "Vesting mismatch");
 
         // Mint test tBTC
         tbtc.mint(deployer, 100e18);

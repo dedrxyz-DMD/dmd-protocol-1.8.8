@@ -4,14 +4,14 @@ pragma solidity 0.8.20;
 import "./interfaces/IDMDToken.sol";
 
 /// @title VestingContract - Diamond Vesting Curve: 5% TGE, 95% linear over 7 years
-/// @dev Fully decentralized, beneficiaries set at deployment
+/// @dev Fully decentralized, mints directly from DMDToken (no external funding needed)
+/// @dev Beneficiaries and allocations set immutably at deployment
 contract VestingContract {
     error InvalidBeneficiary();
     error InvalidAmount();
     error NothingToClaim();
-    error TransferFailed();
     error ArrayLengthMismatch();
-    error InsufficientBalance();
+    error MintFailed();
 
     uint256 public constant TGE_PERCENT = 5;
     uint256 public constant VESTING_PERCENT = 95;
@@ -51,29 +51,29 @@ contract VestingContract {
         totalAllocation = total;
     }
 
+    /// @notice Claim vested DMD (mints directly, no external funding needed)
     function claim() external {
         Beneficiary storage ben = beneficiaries[msg.sender];
         if (ben.totalAllocation == 0) revert InvalidBeneficiary();
 
         uint256 claimable = _vestedAmount(msg.sender) - ben.claimed;
         if (claimable == 0) revert NothingToClaim();
-        if (dmdToken.balanceOf(address(this)) < claimable) revert InsufficientBalance();
 
         ben.claimed += claimable;
-        if (!dmdToken.transfer(msg.sender, claimable)) revert TransferFailed();
+        dmdToken.mint(msg.sender, claimable);
         emit Claimed(msg.sender, claimable);
     }
 
+    /// @notice Claim on behalf of beneficiary (anyone can trigger)
     function claimFor(address beneficiary) external {
         Beneficiary storage ben = beneficiaries[beneficiary];
         if (ben.totalAllocation == 0) revert InvalidBeneficiary();
 
         uint256 claimable = _vestedAmount(beneficiary) - ben.claimed;
         if (claimable == 0) revert NothingToClaim();
-        if (dmdToken.balanceOf(address(this)) < claimable) revert InsufficientBalance();
 
         ben.claimed += claimable;
-        if (!dmdToken.transfer(beneficiary, claimable)) revert TransferFailed();
+        dmdToken.mint(beneficiary, claimable);
         emit Claimed(beneficiary, claimable);
     }
 
@@ -94,7 +94,6 @@ contract VestingContract {
 
     function getAllBeneficiaries() external view returns (address[] memory) { return beneficiaryList; }
     function getBeneficiaryCount() external view returns (uint256) { return beneficiaryList.length; }
-    function getContractBalance() external view returns (uint256) { return dmdToken.balanceOf(address(this)); }
 
     function _vestedAmount(address beneficiary) internal view returns (uint256) {
         Beneficiary memory ben = beneficiaries[beneficiary];
