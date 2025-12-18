@@ -11,6 +11,7 @@ import "../src/VestingContract.sol";
 import "../src/interfaces/IDMDToken.sol";
 import "../src/interfaces/IBTCReserveVault.sol";
 import "../src/interfaces/IEmissionScheduler.sol";
+import "../src/interfaces/IMintDistributor.sol";
 
 contract MockTBTC {
     string public constant name = "Mock tBTC";
@@ -104,7 +105,7 @@ contract DeployDMDFresh is Script {
         dmdToken = new DMDToken(address(distributor), pVesting);
         require(address(dmdToken) == pToken, "Token mismatch");
 
-        redemption = new RedemptionEngine(IDMDToken(address(dmdToken)), IBTCReserveVault(address(vault)));
+        redemption = new RedemptionEngine(IDMDToken(address(dmdToken)), IBTCReserveVault(address(vault)), IMintDistributor(address(distributor)));
         require(address(redemption) == pRedemption, "Redemption mismatch");
 
         // VestingContract - can now mint directly (no external funding needed)

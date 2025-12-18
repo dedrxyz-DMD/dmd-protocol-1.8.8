@@ -69,6 +69,8 @@ contract MintDistributor {
     mapping(uint256 => mapping(address => uint256)) public userWeightSnapshot;
     /// @notice Claim status: epochId => user => claimed
     mapping(uint256 => mapping(address => bool)) public claimed;
+    /// @notice Total DMD minted per position: user => positionId => totalDMD
+    mapping(address => mapping(uint256 => uint256)) public positionDMDMinted;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -156,6 +158,7 @@ contract MintDistributor {
     }
 
     /// @notice Claim DMD for a single epoch
+    /// @dev Distributes DMD proportionally to each active position based on weight
     /// @param epochId Epoch to claim from
     function claim(uint256 epochId) external {
         EpochData storage epoch = epochs[epochId];
@@ -170,10 +173,14 @@ contract MintDistributor {
         uint256 share = (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
         dmdToken.mint(msg.sender, share);
 
+        // Track DMD per position proportionally
+        _distributeToPositions(msg.sender, share, userWeight);
+
         emit Claimed(msg.sender, epochId, share);
     }
 
     /// @notice Claim DMD for multiple epochs at once
+    /// @dev Distributes DMD proportionally to each active position based on weight
     /// @param epochIds Array of epoch IDs to claim from
     function claimMultiple(uint256[] calldata epochIds) external {
         uint256 len = epochIds.length;
@@ -196,6 +203,10 @@ contract MintDistributor {
             claimed[epochId][msg.sender] = true;
             uint256 share = (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
             dmdToken.mint(msg.sender, share);
+
+            // Track DMD per position proportionally
+            _distributeToPositions(msg.sender, share, userWeight);
+
             emit Claimed(msg.sender, epochId, share);
             unchecked { ++i; }
         }
@@ -262,5 +273,47 @@ contract MintDistributor {
     /// @return Next epoch to finalize
     function getNextEpochToFinalize() external view returns (uint256) {
         return nextEpochToFinalize;
+    }
+
+    /// @notice Get total DMD minted for a specific position
+    /// @param user Position owner
+    /// @param positionId Position ID
+    /// @return Total DMD minted to this position
+    function getPositionDMDMinted(address user, uint256 positionId) external view returns (uint256) {
+        return positionDMDMinted[user][positionId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Distribute DMD to positions proportionally based on their weights
+    /// @param user User address
+    /// @param totalDMD Total DMD to distribute
+    /// @param totalUserWeight Total vested weight of user
+    function _distributeToPositions(address user, uint256 totalDMD, uint256 totalUserWeight) internal {
+        if (totalUserWeight == 0) return;
+
+        uint256[] memory positions = vault.getActivePositions(user);
+        uint256 len = positions.length;
+        uint256 distributed = 0;
+
+        for (uint256 i = 0; i < len;) {
+            uint256 posId = positions[i];
+            uint256 posWeight = vault.getPositionVestedWeight(user, posId);
+
+            if (posWeight > 0) {
+                uint256 posShare;
+                if (i == len - 1) {
+                    // Last position gets remainder to avoid rounding dust
+                    posShare = totalDMD - distributed;
+                } else {
+                    posShare = (totalDMD * posWeight) / totalUserWeight;
+                }
+                positionDMDMinted[user][posId] += posShare;
+                distributed += posShare;
+            }
+            unchecked { ++i; }
+        }
     }
 }

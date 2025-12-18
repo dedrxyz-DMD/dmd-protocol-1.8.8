@@ -6,6 +6,7 @@ interface IBTCReserveVault {
     function totalSystemWeight() external view returns (uint256);
     function getVestedWeight(address user) external view returns (uint256);
     function getTotalVestedWeight() external view returns (uint256);
+    function getPositionVestedWeight(address user, uint256 positionId) external view returns (uint256);
     function redeem(address user, uint256 positionId) external;
     function getPosition(address user, uint256 positionId) external view returns (uint256, uint256, uint256, uint256);
     function isUnlocked(address user, uint256 positionId) external view returns (bool);
@@ -13,5 +14,6 @@ interface IBTCReserveVault {
     function getTotalLocked() external view returns (uint256);
     function TBTC() external view returns (address);
     function getActivePositionCount(address user) external view returns (uint256);
+    function getActivePositions(address user) external view returns (uint256[] memory);
     function getTotalUsers() external view returns (uint256);
 }
