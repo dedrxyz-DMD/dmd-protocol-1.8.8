@@ -1,0 +1,36 @@
+# Environment variables (NEVER COMMIT!)
+.env
+.env.local
+.env.*.local
+
+# Foundry build artifacts
+out/
+cache/
+
+# Broadcast files (contain deployment transactions)
+# Keep for reference but be careful with private data
+# broadcast/
+
+# Dependencies (installed via forge install)
+# lib/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node (if using npm/yarn for frontend)
+node_modules/
+
+# Coverage reports
+lcov.info
+coverage/
+
+# Typechain (if using)
+typechain/
+typechain-types/
