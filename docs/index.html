@@ -12,8 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Web3 Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@4.3.0/dist/web3.min.js"></script>
 
     <style>
         * {
@@ -70,23 +69,11 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
             font-size: 1.5rem;
             font-weight: 800;
             color: var(--dark);
             text-decoration: none;
-        }
-
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--gradient);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.25rem;
         }
 
         .nav-links {
@@ -275,6 +262,142 @@
             font-weight: 600;
         }
 
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 420px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray);
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--dark);
+        }
+
+        .wallet-option {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.75rem;
+            background: white;
+            width: 100%;
+            text-align: left;
+        }
+
+        .wallet-option:hover {
+            border-color: var(--primary);
+            background: var(--light);
+        }
+
+        .wallet-option:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .wallet-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .wallet-icon.metamask {
+            background: #f6851b;
+            color: white;
+        }
+
+        .wallet-icon.coinbase {
+            background: #0052ff;
+            color: white;
+        }
+
+        .wallet-icon.walletconnect {
+            background: #3b99fc;
+            color: white;
+        }
+
+        .wallet-icon.injected {
+            background: var(--gradient);
+            color: white;
+        }
+
+        .wallet-info {
+            flex: 1;
+        }
+
+        .wallet-name {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .wallet-desc {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .wallet-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            background: var(--secondary);
+            color: white;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+        }
+
         /* Form Elements */
         .form-group {
             margin-bottom: 1.5rem;
@@ -412,6 +535,11 @@
             border-radius: 50%;
             border-top-color: white;
             animation: spin 0.8s linear infinite;
+        }
+
+        .loading-dark {
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: var(--primary);
         }
 
         @keyframes spin {
@@ -574,12 +702,91 @@
     </style>
 </head>
 <body>
+    <!-- Wallet Selection Modal -->
+    <div class="modal-overlay" id="walletModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Connect Wallet</h3>
+                <button class="modal-close" onclick="closeWalletModal()">&times;</button>
+            </div>
+            <p style="color: var(--gray); margin-bottom: 1.5rem; font-size: 0.9rem;">
+                Connect to Base Network to use DMD Protocol
+            </p>
+
+            <div id="walletOptions">
+                <!-- MetaMask -->
+                <button class="wallet-option" id="metamaskOption" onclick="connectWithMetaMask()">
+                    <div class="wallet-icon metamask">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21.3 2L13 8.5l1.5-3.6L21.3 2z"/>
+                            <path d="M2.7 2l8.2 6.6L9.5 4.9 2.7 2zM18.2 16.8l-2.2 3.4 4.7 1.3 1.3-4.5-3.8-.2zM2 17l1.3 4.5 4.7-1.3-2.2-3.4L2 17z"/>
+                            <path d="M6.7 10.5l-1.8 2.8 4.6.2-.2-5.1-2.6 2.1zM17.3 10.5l-2.6-2.2-.1 5.2 4.6-.2-1.9-2.8zM8 20.2l2.8-1.4-2.4-1.9-.4 3.3zM13.2 18.8l2.8 1.4-.4-3.3-2.4 1.9z"/>
+                        </svg>
+                    </div>
+                    <div class="wallet-info">
+                        <div class="wallet-name">MetaMask<span class="wallet-badge" id="metamaskBadge" style="display:none;">Detected</span></div>
+                        <div class="wallet-desc">Connect using MetaMask extension</div>
+                    </div>
+                </button>
+
+                <!-- Coinbase Wallet -->
+                <button class="wallet-option" id="coinbaseOption" onclick="connectWithCoinbase()">
+                    <div class="wallet-icon coinbase">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10" fill="white"/>
+                            <circle cx="12" cy="12" r="6" fill="#0052ff"/>
+                        </svg>
+                    </div>
+                    <div class="wallet-info">
+                        <div class="wallet-name">Coinbase Wallet<span class="wallet-badge" id="coinbaseBadge" style="display:none;">Detected</span></div>
+                        <div class="wallet-desc">Connect using Coinbase Wallet</div>
+                    </div>
+                </button>
+
+                <!-- Browser Wallet (Generic Injected) -->
+                <button class="wallet-option" id="injectedOption" onclick="connectWithInjected()" style="display:none;">
+                    <div class="wallet-icon injected">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                        </svg>
+                    </div>
+                    <div class="wallet-info">
+                        <div class="wallet-name">Browser Wallet</div>
+                        <div class="wallet-desc">Connect using detected browser wallet</div>
+                    </div>
+                </button>
+            </div>
+
+            <div id="walletConnecting" style="display:none; text-align:center; padding: 2rem;">
+                <div class="loading loading-dark" style="width:40px;height:40px;margin:0 auto 1rem;"></div>
+                <p style="color:var(--gray);">Connecting to wallet...</p>
+            </div>
+
+            <div id="noWalletMessage" style="display:none;">
+                <div class="alert alert-info">
+                    No wallet detected. Install a Web3 wallet to continue.
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <a href="https://metamask.io/download/" target="_blank" class="btn btn-primary" style="flex:1;justify-content:center;">
+                        Install MetaMask
+                    </a>
+                    <a href="https://www.coinbase.com/wallet" target="_blank" class="btn btn-outline" style="flex:1;justify-content:center;">
+                        Coinbase Wallet
+                    </a>
+                </div>
+            </div>
+
+            <p style="color: var(--gray); font-size: 0.8rem; margin-top: 1.5rem; text-align: center;">
+                By connecting, you agree to the protocol's terms. Base Network (Chain ID: 8453)
+            </p>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="header">
         <div class="container">
             <nav class="nav">
                 <a href="#" class="logo">
-                    <div class="logo-icon">💎</div>
                     <span>DMD Protocol</span>
                 </a>
                 <div class="nav-links">
@@ -587,7 +794,7 @@
                     <a href="#positions" class="nav-link">My Positions</a>
                     <a href="#rewards" class="nav-link">Rewards</a>
                     <a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/WHITEPAPER.md" class="nav-link" target="_blank">Docs</a>
-                    <button id="connectWallet" class="btn btn-primary">Connect Wallet</button>
+                    <button id="connectWallet" class="btn btn-primary" onclick="openWalletModal()">Connect Wallet</button>
                 </div>
             </nav>
         </div>
@@ -597,7 +804,7 @@
     <section class="hero">
         <div class="container">
             <div class="badge">
-                🔒 Fully Decentralized · No Owner/Admin · tBTC-Only · Flash Loan Protected
+                Fully Decentralized | No Owner/Admin | tBTC-Only | Flash Loan Protected
             </div>
             <h1>Lock tBTC, Earn DMD Rewards</h1>
             <p>Fully decentralized, immutable protocol on Base. Time-weighted rewards up to 1.48x. 7-day warmup + 3-day vesting for flash loan protection. Zero governance risk.</p>
@@ -649,10 +856,14 @@
                         </div>
                         <div id="walletAddressDisplay" class="wallet-address" style="display: none;"></div>
                     </div>
+                    <button id="disconnectBtn" class="btn btn-outline" style="margin-left:auto;display:none;padding:0.5rem 1rem;font-size:0.85rem;" onclick="disconnectWallet()">
+                        Disconnect
+                    </button>
                 </div>
 
                 <div id="networkWarning" class="alert alert-error" style="display: none;">
                     Wrong network! Please switch to Base Mainnet (Chain ID: 8453)
+                    <button class="btn btn-primary" style="margin-left:auto;padding:0.5rem 1rem;" onclick="switchToBase()">Switch Network</button>
                 </div>
 
                 <div id="web3Status" class="alert alert-info" style="display: none;">
@@ -675,9 +886,9 @@
 
             <!-- Tabs -->
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('lock')">🔒 Lock tBTC</button>
-                <button class="tab" onclick="switchTab('positions')">📊 My Positions</button>
-                <button class="tab" onclick="switchTab('rewards')">🎁 Claim Rewards</button>
+                <button class="tab active" onclick="switchTab('lock')">Lock tBTC</button>
+                <button class="tab" onclick="switchTab('positions')">My Positions</button>
+                <button class="tab" onclick="switchTab('rewards')">Claim Rewards</button>
             </div>
 
             <!-- Lock Tab -->
@@ -722,7 +933,7 @@
                                 oninput="updateDuration(); calculateWeight()"
                             >
                             <div class="form-helper">
-                                Min: 1 month · Max: 120 months (10 years) · Max weight bonus at 24 months (1.48x)
+                                Min: 1 month | Max: 120 months (10 years) | Max weight bonus at 24 months (1.48x)
                             </div>
                         </div>
 
@@ -809,7 +1020,7 @@
                         <ul style="margin-top: 0.5rem; margin-left: 1rem;">
                             <li>Rewards distributed every 7 days (epoch)</li>
                             <li>Your share is proportional to your <strong>vested</strong> weight</li>
-                            <li>Year 1: 3.6M DMD · 18% annual decay · 14.4M cap</li>
+                            <li>Year 1: 3.6M DMD | 18% annual decay | 14.4M cap</li>
                             <li>Emissions auto-started at deployment</li>
                         </ul>
                     </div>
@@ -834,19 +1045,19 @@
                 <h2 class="section-title">Why DMD Protocol?</h2>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
                     <div class="card">
-                        <h3 class="card-title">🔒 Fully Decentralized</h3>
+                        <h3 class="card-title">Fully Decentralized</h3>
                         <p>No owner, no admin, no governance. Zero centralization risk. All parameters immutable after deployment. Code is law.</p>
                     </div>
                     <div class="card">
-                        <h3 class="card-title">⚡ Flash Loan Protected</h3>
+                        <h3 class="card-title">Flash Loan Protected</h3>
                         <p>7-day warmup period before weight counts, plus 3-day linear vesting. Impossible to game with flash loans or quick deposits.</p>
                     </div>
                     <div class="card">
-                        <h3 class="card-title">💎 tBTC-Only</h3>
+                        <h3 class="card-title">tBTC-Only</h3>
                         <p>Only accepts tBTC on Base chain. Single asset focus means simpler, more secure protocol. Immutable token address.</p>
                     </div>
                     <div class="card">
-                        <h3 class="card-title">📈 Time-Weighted Rewards</h3>
+                        <h3 class="card-title">Time-Weighted Rewards</h3>
                         <p>Longer locks earn higher multipliers: 1.02x (1 month) up to 1.48x (24+ months). Fair and transparent distribution.</p>
                     </div>
                 </div>
@@ -957,293 +1168,323 @@
         // Configuration - DMD Protocol v1.8.8
         const CONFIG = {
             CHAIN_ID: 8453, // Base Mainnet
+            CHAIN_ID_HEX: '0x2105',
             CHAIN_NAME: 'Base',
             RPC_URL: 'https://mainnet.base.org',
             EXPLORER_URL: 'https://basescan.org',
 
             // Contract Addresses (UPDATE AFTER DEPLOYMENT)
             TBTC_ADDRESS: '0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b',
-            DMD_TOKEN_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
-            VAULT_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
-            DISTRIBUTOR_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
-            REDEMPTION_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+            DMD_TOKEN_ADDRESS: '0x0000000000000000000000000000000000000000',
+            VAULT_ADDRESS: '0x0000000000000000000000000000000000000000',
+            DISTRIBUTOR_ADDRESS: '0x0000000000000000000000000000000000000000',
+            REDEMPTION_ADDRESS: '0x0000000000000000000000000000000000000000',
 
             // Protocol constants
-            WEIGHT_WARMUP_PERIOD: 7 * 24 * 60 * 60, // 7 days in seconds
-            WEIGHT_VESTING_PERIOD: 3 * 24 * 60 * 60, // 3 days in seconds
-            EPOCH_DURATION: 7 * 24 * 60 * 60, // 7 days in seconds
+            WEIGHT_WARMUP_PERIOD: 7 * 24 * 60 * 60,
+            WEIGHT_VESTING_PERIOD: 3 * 24 * 60 * 60,
+            EPOCH_DURATION: 7 * 24 * 60 * 60,
             MAX_WEIGHT_MONTHS: 24,
-            WEIGHT_PER_MONTH: 0.02, // 2% per month
+            WEIGHT_PER_MONTH: 0.02,
         };
 
-        // ABIs (Minimal for UI)
+        // ABIs
         const ERC20_ABI = [
-            {
-                "constant": true,
-                "inputs": [{"name": "_owner", "type": "address"}],
-                "name": "balanceOf",
-                "outputs": [{"name": "balance", "type": "uint256"}],
-                "type": "function"
-            },
-            {
-                "constant": false,
-                "inputs": [
-                    {"name": "_spender", "type": "address"},
-                    {"name": "_value", "type": "uint256"}
-                ],
-                "name": "approve",
-                "outputs": [{"name": "", "type": "bool"}],
-                "type": "function"
-            }
+            {"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"},
+            {"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+            {"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"type":"function"}
         ];
 
         const VAULT_ABI = [
-            {
-                "inputs": [
-                    {"name": "amount", "type": "uint256"},
-                    {"name": "lockMonths", "type": "uint256"}
-                ],
-                "name": "lock",
-                "outputs": [{"name": "positionId", "type": "uint256"}],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "totalLocked",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "totalSystemWeight",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [{"name": "user", "type": "address"}],
-                "name": "positionCount",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [{"name": "user", "type": "address"}],
-                "name": "getVestedWeight",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {"name": "user", "type": "address"},
-                    {"name": "positionId", "type": "uint256"}
-                ],
-                "name": "getPosition",
-                "outputs": [
-                    {"name": "amount", "type": "uint256"},
-                    {"name": "lockMonths", "type": "uint256"},
-                    {"name": "unlockTime", "type": "uint256"},
-                    {"name": "weight", "type": "uint256"}
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {"name": "user", "type": "address"},
-                    {"name": "positionId", "type": "uint256"}
-                ],
-                "name": "getPositionVestedWeight",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {"name": "user", "type": "address"},
-                    {"name": "positionId", "type": "uint256"}
-                ],
-                "name": "isUnlocked",
-                "outputs": [{"name": "", "type": "bool"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {"name": "user", "type": "address"},
-                    {"name": "positionId", "type": "uint256"}
-                ],
-                "name": "isWeightFullyVested",
-                "outputs": [{"name": "", "type": "bool"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "TBTC",
-                "outputs": [{"name": "", "type": "address"}],
-                "stateMutability": "view",
-                "type": "function"
-            }
+            {"inputs":[{"name":"amount","type":"uint256"},{"name":"lockMonths","type":"uint256"}],"name":"lock","outputs":[{"name":"positionId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"totalLocked","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"totalSystemWeight","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"}],"name":"positionCount","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"}],"name":"getVestedWeight","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"},{"name":"positionId","type":"uint256"}],"name":"getPosition","outputs":[{"name":"amount","type":"uint256"},{"name":"lockMonths","type":"uint256"},{"name":"unlockTime","type":"uint256"},{"name":"weight","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"},{"name":"positionId","type":"uint256"}],"name":"getPositionVestedWeight","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"},{"name":"positionId","type":"uint256"}],"name":"isUnlocked","outputs":[{"name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"user","type":"address"},{"name":"positionId","type":"uint256"}],"name":"isWeightFullyVested","outputs":[{"name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"TBTC","outputs":[{"name":"","type":"address"}],"stateMutability":"view","type":"function"}
         ];
 
         // State
-        let web3;
-        let userAccount;
-        let tbtcContract;
-        let vaultContract;
-        let dmdContract;
+        let web3 = null;
+        let userAccount = null;
+        let currentProvider = null;
+        let tbtcContract = null;
+        let vaultContract = null;
+        let dmdContract = null;
 
-        // Initialize
-        window.addEventListener('load', async () => {
-            console.log('DMD Protocol v1.8.8 - Initializing...');
+        // Wallet Detection
+        function detectWallets() {
+            const wallets = {
+                metamask: false,
+                coinbase: false,
+                injected: false
+            };
 
-            const statusDiv = document.getElementById('web3Status');
-            const statusMsg = document.getElementById('web3StatusMessage');
+            if (typeof window.ethereum !== 'undefined') {
+                wallets.injected = true;
 
-            // Check if Web3 library loaded
-            if (typeof Web3 === 'undefined') {
-                console.error('Web3 library failed to load!');
-                statusDiv.style.display = 'block';
-                statusMsg.textContent = 'Web3 library failed to load. Please refresh the page.';
-                statusDiv.className = 'alert alert-error';
+                // MetaMask detection
+                if (window.ethereum.isMetaMask) {
+                    wallets.metamask = true;
+                }
+
+                // Coinbase Wallet detection
+                if (window.ethereum.isCoinbaseWallet || window.ethereum.providers?.some(p => p.isCoinbaseWallet)) {
+                    wallets.coinbase = true;
+                }
+            }
+
+            return wallets;
+        }
+
+        function updateWalletModalUI() {
+            const wallets = detectWallets();
+            const noWalletMsg = document.getElementById('noWalletMessage');
+            const walletOptions = document.getElementById('walletOptions');
+
+            // Show/hide detected badges
+            if (wallets.metamask) {
+                document.getElementById('metamaskBadge').style.display = 'inline';
+            }
+            if (wallets.coinbase) {
+                document.getElementById('coinbaseBadge').style.display = 'inline';
+            }
+
+            // Show browser wallet option if there's an injected provider that's not MetaMask or Coinbase
+            if (wallets.injected && !wallets.metamask && !wallets.coinbase) {
+                document.getElementById('injectedOption').style.display = 'flex';
+            }
+
+            // Show no wallet message if nothing detected
+            if (!wallets.injected) {
+                walletOptions.style.display = 'none';
+                noWalletMsg.style.display = 'block';
+            }
+        }
+
+        // Modal Functions
+        function openWalletModal() {
+            updateWalletModalUI();
+            document.getElementById('walletModal').classList.add('active');
+            document.getElementById('walletOptions').style.display = 'block';
+            document.getElementById('walletConnecting').style.display = 'none';
+        }
+
+        function closeWalletModal() {
+            document.getElementById('walletModal').classList.remove('active');
+        }
+
+        function showConnecting() {
+            document.getElementById('walletOptions').style.display = 'none';
+            document.getElementById('walletConnecting').style.display = 'block';
+        }
+
+        // Get specific provider
+        function getProvider(type) {
+            if (!window.ethereum) return null;
+
+            // Handle multiple providers
+            if (window.ethereum.providers?.length) {
+                switch(type) {
+                    case 'metamask':
+                        return window.ethereum.providers.find(p => p.isMetaMask);
+                    case 'coinbase':
+                        return window.ethereum.providers.find(p => p.isCoinbaseWallet);
+                    default:
+                        return window.ethereum.providers[0];
+                }
+            }
+
+            // Single provider
+            return window.ethereum;
+        }
+
+        // Connect Functions
+        async function connectWithMetaMask() {
+            const provider = getProvider('metamask');
+            if (!provider) {
+                window.open('https://metamask.io/download/', '_blank');
                 return;
             }
-            console.log('Web3 library loaded successfully');
+            await connectWallet(provider, 'MetaMask');
+        }
 
-            // Check MetaMask availability
-            if (typeof window.ethereum === 'undefined') {
-                console.warn('No Web3 wallet detected');
-                statusDiv.style.display = 'block';
-                statusMsg.innerHTML = 'No Web3 wallet detected. Please install <a href="https://metamask.io" target="_blank" style="color: inherit; text-decoration: underline;">MetaMask</a> to use this dApp.';
-            } else {
-                console.log('Web3 wallet detected');
+        async function connectWithCoinbase() {
+            const provider = getProvider('coinbase');
+            if (!provider) {
+                window.open('https://www.coinbase.com/wallet', '_blank');
+                return;
             }
+            await connectWallet(provider, 'Coinbase Wallet');
+        }
 
-            await checkWalletConnection();
-            updateDuration();
-            calculateWeight();
-
-            // Setup event listeners
-            const connectButton = document.getElementById('connectWallet');
-            if (connectButton) {
-                console.log('Connect button found, attaching event listener');
-                connectButton.disabled = false;
-                connectButton.style.pointerEvents = 'auto';
-                connectButton.style.opacity = '1';
-
-                connectButton.addEventListener('click', (e) => {
-                    console.log('Connect button clicked');
-                    e.preventDefault();
-                    e.stopPropagation();
-                    connectWallet();
-                });
+        async function connectWithInjected() {
+            const provider = window.ethereum;
+            if (!provider) {
+                alert('No wallet detected');
+                return;
             }
+            await connectWallet(provider, 'Browser Wallet');
+        }
 
-            const lockForm = document.getElementById('lockForm');
-            if (lockForm) {
-                lockForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    await lockTBTC();
-                });
-            }
-
-            console.log('Initialization complete');
-        });
-
-        async function connectWallet() {
+        async function connectWallet(provider, walletName) {
             try {
-                console.log('Connecting wallet...');
+                showConnecting();
+                console.log(`Connecting to ${walletName}...`);
 
-                if (typeof window.ethereum !== 'undefined') {
-                    const accounts = await window.ethereum.request({
-                        method: 'eth_requestAccounts'
-                    });
+                // Request accounts
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
 
-                    console.log('Accounts received:', accounts);
-                    userAccount = accounts[0];
-                    web3 = new Web3(window.ethereum);
-
-                    // Check network
-                    const chainId = await web3.eth.getChainId();
-                    console.log('Current chain ID:', chainId);
-                    if (chainId !== CONFIG.CHAIN_ID) {
-                        console.log('Wrong network, switching to Base...');
-                        await switchToBase();
-                        return;
-                    }
-
-                    // Initialize contracts
-                    console.log('Initializing contracts...');
-                    await initializeContracts();
-
-                    // Update UI
-                    console.log('Updating UI...');
-                    updateWalletUI(true);
-                    await loadUserData();
-
-                    console.log('Wallet connected successfully!');
-                    alert('Wallet connected successfully!');
-
-                    // Listen for changes
-                    window.ethereum.on('accountsChanged', handleAccountsChanged);
-                    window.ethereum.on('chainChanged', () => window.location.reload());
-
-                } else {
-                    console.error('No Web3 provider found');
-                    alert('Please install MetaMask or another Web3 wallet!');
+                if (!accounts || accounts.length === 0) {
+                    throw new Error('No accounts returned');
                 }
+
+                userAccount = accounts[0];
+                currentProvider = provider;
+
+                // Initialize Web3
+                web3 = new Web3(provider);
+
+                // Check network
+                const chainId = await provider.request({ method: 'eth_chainId' });
+                const chainIdNum = parseInt(chainId, 16);
+
+                console.log('Connected to chain:', chainIdNum);
+
+                if (chainIdNum !== CONFIG.CHAIN_ID) {
+                    closeWalletModal();
+                    document.getElementById('networkWarning').style.display = 'flex';
+                    await switchToBase();
+                    return;
+                }
+
+                // Initialize contracts
+                await initializeContracts();
+
+                // Update UI
+                updateWalletUI(true, walletName);
+                await loadUserData();
+
+                closeWalletModal();
+
+                // Setup event listeners
+                provider.on('accountsChanged', handleAccountsChanged);
+                provider.on('chainChanged', handleChainChanged);
+
+                console.log(`${walletName} connected successfully!`);
+
             } catch (error) {
-                console.error('Failed to connect wallet:', error);
-                alert('Failed to connect wallet: ' + error.message);
+                console.error('Connection failed:', error);
+                closeWalletModal();
+
+                if (error.code === 4001) {
+                    alert('Connection rejected. Please try again.');
+                } else {
+                    alert('Failed to connect: ' + (error.message || 'Unknown error'));
+                }
             }
         }
 
         async function switchToBase() {
+            if (!currentProvider && !window.ethereum) {
+                alert('No wallet connected');
+                return;
+            }
+
+            const provider = currentProvider || window.ethereum;
+
             try {
-                await window.ethereum.request({
+                await provider.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x' + CONFIG.CHAIN_ID.toString(16) }],
+                    params: [{ chainId: CONFIG.CHAIN_ID_HEX }],
                 });
-                await connectWallet();
-            } catch (error) {
-                if (error.code === 4902) {
-                    await window.ethereum.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [{
-                            chainId: '0x' + CONFIG.CHAIN_ID.toString(16),
-                            chainName: 'Base',
-                            nativeCurrency: {
-                                name: 'Ethereum',
-                                symbol: 'ETH',
-                                decimals: 18
-                            },
-                            rpcUrls: [CONFIG.RPC_URL],
-                            blockExplorerUrls: [CONFIG.EXPLORER_URL]
-                        }]
-                    });
-                    await connectWallet();
+                document.getElementById('networkWarning').style.display = 'none';
+
+                // Reconnect after switching
+                if (userAccount) {
+                    await loadUserData();
+                }
+            } catch (switchError) {
+                // Chain not added
+                if (switchError.code === 4902) {
+                    try {
+                        await provider.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: CONFIG.CHAIN_ID_HEX,
+                                chainName: 'Base',
+                                nativeCurrency: {
+                                    name: 'Ethereum',
+                                    symbol: 'ETH',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://mainnet.base.org'],
+                                blockExplorerUrls: ['https://basescan.org']
+                            }]
+                        });
+                        document.getElementById('networkWarning').style.display = 'none';
+                    } catch (addError) {
+                        console.error('Failed to add Base network:', addError);
+                        alert('Failed to add Base network. Please add it manually.');
+                    }
+                } else {
+                    console.error('Failed to switch network:', switchError);
                 }
             }
         }
 
-        async function checkWalletConnection() {
+        function disconnectWallet() {
+            userAccount = null;
+            currentProvider = null;
+            web3 = null;
+            tbtcContract = null;
+            vaultContract = null;
+            dmdContract = null;
+
+            updateWalletUI(false);
+
+            // Reset displays
+            document.getElementById('tbtcBalance').textContent = '0';
+            document.getElementById('dmdBalance').textContent = '0';
+            document.getElementById('availableBalance').textContent = '0';
+            document.getElementById('totalLocked').textContent = '0';
+            document.getElementById('totalWeight').textContent = '0';
+        }
+
+        async function checkExistingConnection() {
             if (typeof window.ethereum !== 'undefined') {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    userAccount = accounts[0];
-                    web3 = new Web3(window.ethereum);
-                    await initializeContracts();
-                    updateWalletUI(true);
-                    await loadUserData();
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    if (accounts && accounts.length > 0) {
+                        userAccount = accounts[0];
+                        currentProvider = window.ethereum;
+                        web3 = new Web3(window.ethereum);
+
+                        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                        if (parseInt(chainId, 16) === CONFIG.CHAIN_ID) {
+                            await initializeContracts();
+                            updateWalletUI(true);
+                            await loadUserData();
+
+                            window.ethereum.on('accountsChanged', handleAccountsChanged);
+                            window.ethereum.on('chainChanged', handleChainChanged);
+                        } else {
+                            document.getElementById('networkWarning').style.display = 'flex';
+                        }
+                    }
+                } catch (error) {
+                    console.log('No existing connection:', error);
                 }
             }
         }
 
         async function initializeContracts() {
+            if (!web3) return;
+
             tbtcContract = new web3.eth.Contract(ERC20_ABI, CONFIG.TBTC_ADDRESS);
 
             if (CONFIG.VAULT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
@@ -1254,22 +1495,24 @@
             }
         }
 
-        function updateWalletUI(connected) {
+        function updateWalletUI(connected, walletName = '') {
             const statusIndicator = document.getElementById('statusIndicator');
             const connectionStatus = document.getElementById('connectionStatus');
             const walletAddressDisplay = document.getElementById('walletAddressDisplay');
             const balanceInfo = document.getElementById('balanceInfo');
             const connectButton = document.getElementById('connectWallet');
+            const disconnectBtn = document.getElementById('disconnectBtn');
             const lockButton = document.getElementById('lockButton');
 
-            if (connected) {
+            if (connected && userAccount) {
                 statusIndicator.classList.add('connected');
-                connectionStatus.textContent = 'Connected';
+                connectionStatus.textContent = walletName ? `Connected via ${walletName}` : 'Connected';
                 walletAddressDisplay.textContent = shortenAddress(userAccount);
                 walletAddressDisplay.style.display = 'block';
                 balanceInfo.style.display = 'block';
-                connectButton.textContent = 'Connected';
-                connectButton.disabled = true;
+                connectButton.textContent = shortenAddress(userAccount);
+                connectButton.onclick = openWalletModal;
+                disconnectBtn.style.display = 'block';
                 lockButton.disabled = false;
             } else {
                 statusIndicator.classList.remove('connected');
@@ -1277,25 +1520,30 @@
                 walletAddressDisplay.style.display = 'none';
                 balanceInfo.style.display = 'none';
                 connectButton.textContent = 'Connect Wallet';
-                connectButton.disabled = false;
+                connectButton.onclick = openWalletModal;
+                disconnectBtn.style.display = 'none';
                 lockButton.disabled = true;
             }
         }
 
         async function loadUserData() {
+            if (!web3 || !userAccount) return;
+
             try {
                 // Load tBTC balance
-                const tbtcBalance = await tbtcContract.methods.balanceOf(userAccount).call();
-                document.getElementById('tbtcBalance').textContent = formatAmount(tbtcBalance);
-                document.getElementById('availableBalance').textContent = formatAmount(tbtcBalance);
+                if (tbtcContract) {
+                    const tbtcBalance = await tbtcContract.methods.balanceOf(userAccount).call();
+                    document.getElementById('tbtcBalance').textContent = formatAmount(tbtcBalance);
+                    document.getElementById('availableBalance').textContent = formatAmount(tbtcBalance);
+                }
 
-                // Load DMD balance if contract is deployed
+                // Load DMD balance
                 if (dmdContract) {
                     const dmdBalance = await dmdContract.methods.balanceOf(userAccount).call();
                     document.getElementById('dmdBalance').textContent = formatAmount(dmdBalance);
                 }
 
-                // Load protocol stats if vault is deployed
+                // Load protocol stats
                 if (vaultContract) {
                     const totalLocked = await vaultContract.methods.totalLocked().call();
                     const totalWeight = await vaultContract.methods.totalSystemWeight().call();
@@ -1303,11 +1551,9 @@
                     document.getElementById('totalLocked').textContent = formatAmount(totalLocked);
                     document.getElementById('totalWeight').textContent = formatAmount(totalWeight);
 
-                    // Load user vested weight
                     const userVestedWeight = await vaultContract.methods.getVestedWeight(userAccount).call();
                     document.getElementById('userTotalWeight').textContent = formatAmount(userVestedWeight);
 
-                    // Load user positions
                     await loadPositions();
                 }
             } catch (error) {
@@ -1316,21 +1562,23 @@
         }
 
         async function loadPositions() {
+            if (!vaultContract || !userAccount) return;
+
             try {
                 const positionCount = await vaultContract.methods.positionCount(userAccount).call();
                 const tbody = document.getElementById('positionsTableBody');
                 tbody.innerHTML = '';
 
+                document.getElementById('positionsLoading').style.display = 'none';
+
                 if (positionCount == 0) {
                     document.getElementById('noPositions').style.display = 'block';
                     document.getElementById('positionsContainer').style.display = 'none';
-                    document.getElementById('positionsLoading').style.display = 'none';
                     return;
                 }
 
                 document.getElementById('noPositions').style.display = 'none';
                 document.getElementById('positionsContainer').style.display = 'block';
-                document.getElementById('positionsLoading').style.display = 'none';
 
                 for (let i = 0; i < positionCount; i++) {
                     const position = await vaultContract.methods.getPosition(userAccount, i).call();
@@ -1340,13 +1588,13 @@
 
                     let vestingStatus = '';
                     if (position.amount == 0) {
-                        vestingStatus = '⚫ Redeemed';
+                        vestingStatus = 'Redeemed';
                     } else if (isFullyVested) {
-                        vestingStatus = '🟢 Fully Vested';
+                        vestingStatus = 'Fully Vested';
                     } else if (vestedWeight > 0) {
-                        vestingStatus = '🟡 Vesting';
+                        vestingStatus = 'Vesting';
                     } else {
-                        vestingStatus = '⏳ Warmup';
+                        vestingStatus = 'Warmup';
                     }
 
                     const row = tbody.insertRow();
@@ -1356,8 +1604,8 @@
                         <td>${position.lockMonths} months</td>
                         <td>${formatAmount(position.weight)}</td>
                         <td>${formatAmount(vestedWeight)}</td>
-                        <td>${new Date(position.unlockTime * 1000).toLocaleDateString()}</td>
-                        <td>${vestingStatus} ${isUnlocked ? '· 🔓' : '· 🔒'}</td>
+                        <td>${new Date(Number(position.unlockTime) * 1000).toLocaleDateString()}</td>
+                        <td>${vestingStatus} ${isUnlocked ? '| Unlocked' : '| Locked'}</td>
                         <td>
                             ${isUnlocked && position.amount > 0 ? '<button class="btn btn-secondary" onclick="redeemPosition(' + i + ')">Redeem</button>' : '-'}
                         </td>
@@ -1365,36 +1613,67 @@
                 }
             } catch (error) {
                 console.error('Error loading positions:', error);
+                document.getElementById('positionsLoading').style.display = 'none';
             }
         }
 
+        // Event Handlers
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else if (accounts[0] !== userAccount) {
+                userAccount = accounts[0];
+                updateWalletUI(true);
+                loadUserData();
+            }
+        }
+
+        function handleChainChanged(chainId) {
+            const chainIdNum = parseInt(chainId, 16);
+            if (chainIdNum !== CONFIG.CHAIN_ID) {
+                document.getElementById('networkWarning').style.display = 'flex';
+            } else {
+                document.getElementById('networkWarning').style.display = 'none';
+                loadUserData();
+            }
+        }
+
+        // Lock Function
         async function lockTBTC() {
+            if (!web3 || !userAccount) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            const amount = document.getElementById('lockAmount').value;
+            const months = document.getElementById('lockMonths').value;
+
+            if (!amount || parseFloat(amount) <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+
+            if (!vaultContract) {
+                alert('Contracts not deployed yet. Please check back after deployment.');
+                return;
+            }
+
+            const lockButton = document.getElementById('lockButton');
+
             try {
-                const amount = document.getElementById('lockAmount').value;
-                const months = document.getElementById('lockMonths').value;
-
-                if (!amount || amount <= 0) {
-                    alert('Please enter a valid amount');
-                    return;
-                }
-
-                if (!vaultContract) {
-                    alert('Contracts not deployed yet. Please check back after deployment.');
-                    return;
-                }
-
                 const amountWei = web3.utils.toWei(amount, 'ether');
-                const lockButton = document.getElementById('lockButton');
 
                 lockButton.disabled = true;
-                lockButton.innerHTML = '<span class="loading"></span> Processing...';
+                lockButton.innerHTML = '<span class="loading"></span> Approving...';
 
-                // Step 1: Approve tBTC
+                // Approve
                 await tbtcContract.methods.approve(CONFIG.VAULT_ADDRESS, amountWei).send({
                     from: userAccount
                 });
 
-                // Step 2: Lock
+                lockButton.innerHTML = '<span class="loading"></span> Locking...';
+
+                // Lock
                 await vaultContract.methods.lock(amountWei, months).send({
                     from: userAccount
                 });
@@ -1409,15 +1688,24 @@
 
             } catch (error) {
                 console.error('Lock failed:', error);
-                alert('Transaction failed: ' + error.message);
+                if (error.code !== 4001) {
+                    alert('Transaction failed: ' + (error.message || 'Unknown error'));
+                }
             } finally {
-                const lockButton = document.getElementById('lockButton');
                 lockButton.disabled = false;
                 lockButton.textContent = 'Lock tBTC';
             }
         }
 
-        // Calculations
+        async function redeemPosition(positionId) {
+            if (!CONFIG.REDEMPTION_ADDRESS || CONFIG.REDEMPTION_ADDRESS === '0x0000000000000000000000000000000000000000') {
+                alert('Redemption contract not deployed yet.');
+                return;
+            }
+            alert('Redemption requires burning DMD tokens equal to position weight.\n\nPlease use the RedemptionEngine contract directly.');
+        }
+
+        // UI Functions
         function updateDuration() {
             const months = document.getElementById('lockMonths').value;
             document.getElementById('lockMonthsDisplay').textContent = months;
@@ -1431,7 +1719,6 @@
             const amount = parseFloat(document.getElementById('lockAmount').value) || 0;
             const months = parseInt(document.getElementById('lockMonths').value);
 
-            // Weight formula: 1.0 + min(months, 24) * 0.02
             const effectiveMonths = Math.min(months, CONFIG.MAX_WEIGHT_MONTHS);
             const multiplier = 1.0 + (effectiveMonths * CONFIG.WEIGHT_PER_MONTH);
             const weight = amount * multiplier;
@@ -1440,16 +1727,11 @@
             document.getElementById('totalWeightPreview').textContent = weight.toFixed(6);
         }
 
-        // Tab switching
         function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             event.target.classList.add('active');
 
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName + 'Tab').classList.add('active');
 
             if (tabName === 'positions' && userAccount) {
@@ -1457,39 +1739,45 @@
             }
         }
 
-        // Helpers
         function shortenAddress(address) {
+            if (!address) return '';
             return address.slice(0, 6) + '...' + address.slice(-4);
         }
 
         function formatAmount(wei) {
-            return parseFloat(web3.utils.fromWei(wei.toString(), 'ether')).toFixed(6);
-        }
-
-        function handleAccountsChanged(accounts) {
-            if (accounts.length === 0) {
-                updateWalletUI(false);
-                userAccount = null;
-            } else if (accounts[0] !== userAccount) {
-                userAccount = accounts[0];
-                updateWalletUI(true);
-                loadUserData();
-            }
-        }
-
-        async function redeemPosition(positionId) {
+            if (!web3 || !wei) return '0';
             try {
-                if (!CONFIG.REDEMPTION_ADDRESS || CONFIG.REDEMPTION_ADDRESS === '0x0000000000000000000000000000000000000000') {
-                    alert('Redemption contract not deployed yet. Please check back after deployment.');
-                    return;
-                }
-
-                alert('Redemption requires burning DMD tokens equal to position weight.\n\nPlease use the RedemptionEngine contract directly.');
-            } catch (error) {
-                console.error('Redemption failed:', error);
-                alert('Redemption failed: ' + error.message);
+                return parseFloat(web3.utils.fromWei(wei.toString(), 'ether')).toFixed(6);
+            } catch {
+                return '0';
             }
         }
+
+        // Initialize
+        window.addEventListener('load', async () => {
+            console.log('DMD Protocol v1.8.8 - Initializing...');
+
+            updateDuration();
+            calculateWeight();
+
+            // Check for existing connection
+            await checkExistingConnection();
+
+            // Form submit handler
+            document.getElementById('lockForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await lockTBTC();
+            });
+
+            // Close modal on outside click
+            document.getElementById('walletModal').addEventListener('click', (e) => {
+                if (e.target.id === 'walletModal') {
+                    closeWalletModal();
+                }
+            });
+
+            console.log('Initialization complete');
+        });
     </script>
 </body>
 </html>
