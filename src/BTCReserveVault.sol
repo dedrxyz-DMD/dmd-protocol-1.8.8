@@ -248,17 +248,6 @@ contract BTCReserveVault {
     }
 
     /**
-     * @notice Check if position is unlocked
-     */
-    function isPositionUnlocked(address user, uint256 positionId) external view returns (bool) {
-        Position memory pos = positions[user][positionId];
-        if (pos.amount == 0) return false;
-
-        uint256 unlockTime = pos.lockTime + (pos.lockMonths * 30 days);
-        return block.timestamp >= unlockTime;
-    }
-
-    /**
      * @notice Get total locked amount for a specific BTC asset
      */
     function getTotalLockedByAsset(address btcAsset) external view returns (uint256) {
