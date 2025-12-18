@@ -27,7 +27,7 @@ DMD Protocol is a decentralized system for locking tBTC (Threshold Network Bitco
 
 - BTCReserveVault.sol: tBTC locking and weight tracking (~400 LOC)
 - MintDistributor.sol: Epoch-based reward distribution (~270 LOC)
-- EmissionScheduler.sol: 18% decay emissions schedule (~220 LOC)
+- EmissionScheduler.sol: 25% decay emissions schedule (~220 LOC)
 - DMDToken.sol: ERC20 DMD token (~160 LOC)
 - RedemptionEngine.sol: tBTC withdrawal logic (~200 LOC)
 - VestingContract.sol: Team token vesting (~280 LOC)
