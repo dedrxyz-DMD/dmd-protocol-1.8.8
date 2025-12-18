@@ -16,7 +16,7 @@ DMD Protocol is a decentralized system for locking tBTC (Threshold Network Bitco
 - **Permanently Immutable**: No governance, no setters, no upgrades, no multi-sig
 - **Flash Loan Protection**: 10-day activation period prevents attack vectors
 - **Time-Weighted Rewards**: Lock duration multipliers (1.0x to 1.48x)
-- **Emissions Decay**: 18% annual reduction with 18M DMD max supply
+- **Emissions Decay**: 25% annual reduction with 18M DMD max supply
 - **Fully Audited**: 160 comprehensive tests passing
 
 ---
