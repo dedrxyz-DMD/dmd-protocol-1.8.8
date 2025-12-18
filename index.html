@@ -1,0 +1,2989 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>DMD Protocol v1.8.8 - tBTC Locking on Base</title>
+
+    <meta name="description" content="Lock tBTC on Base, earn DMD rewards with time-weighted multipliers. Fully decentralized, immutable, security audited protocol.">
+
+ 
+
+    <!-- Fonts -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+ 
+
+    <!-- Web3 Libraries -->
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+
+ 
+
+    <style>
+
+        * {
+
+            margin: 0;
+
+            padding: 0;
+
+            box-sizing: border-box;
+
+        }
+
+ 
+
+        :root {
+
+            --primary: #3b82f6;
+
+            --primary-dark: #2563eb;
+
+            --secondary: #10b981;
+
+            --danger: #ef4444;
+
+            --warning: #f59e0b;
+
+            --dark: #1e293b;
+
+            --dark-light: #334155;
+
+            --gray: #64748b;
+
+            --light: #f1f5f9;
+
+            --white: #ffffff;
+
+            --border: #e2e8f0;
+
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        }
+
+ 
+
+        body {
+
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+            background: var(--light);
+
+            color: var(--dark);
+
+            line-height: 1.6;
+
+        }
+
+ 
+
+        /* Header */
+
+        .header {
+
+            background: var(--white);
+
+            border-bottom: 1px solid var(--border);
+
+            padding: 1rem 0;
+
+            position: sticky;
+
+            top: 0;
+
+            z-index: 1000;
+
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+        }
+
+ 
+
+        .container {
+
+            max-width: 1200px;
+
+            margin: 0 auto;
+
+            padding: 0 1.5rem;
+
+        }
+
+ 
+
+        .nav {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+        }
+
+ 
+
+        .logo {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 0.75rem;
+
+            font-size: 1.5rem;
+
+            font-weight: 800;
+
+            color: var(--dark);
+
+            text-decoration: none;
+
+        }
+
+ 
+
+        .logo-icon {
+
+            width: 40px;
+
+            height: 40px;
+
+            background: var(--gradient);
+
+            border-radius: 8px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            color: white;
+
+            font-size: 1.25rem;
+
+        }
+
+ 
+
+        .nav-links {
+
+            display: flex;
+
+            gap: 2rem;
+
+            align-items: center;
+
+        }
+
+ 
+
+        .nav-link {
+
+            color: var(--gray);
+
+            text-decoration: none;
+
+            font-weight: 500;
+
+            transition: color 0.2s;
+
+        }
+
+ 
+
+        .nav-link:hover {
+
+            color: var(--primary);
+
+        }
+
+ 
+
+        .btn {
+
+            padding: 0.75rem 1.5rem;
+
+            border: none;
+
+            border-radius: 8px;
+
+            font-weight: 600;
+
+            cursor: pointer;
+
+            transition: all 0.2s;
+
+            font-size: 0.95rem;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 0.5rem;
+
+        }
+
+ 
+
+        .btn-primary {
+
+            background: var(--primary);
+
+            color: white;
+
+        }
+
+ 
+
+        .btn-primary:hover {
+
+            background: var(--primary-dark);
+
+            transform: translateY(-1px);
+
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+
+        }
+
+ 
+
+        .btn-secondary {
+
+            background: var(--secondary);
+
+            color: white;
+
+        }
+
+ 
+
+        .btn-outline {
+
+            background: transparent;
+
+            border: 2px solid var(--primary);
+
+            color: var(--primary);
+
+        }
+
+ 
+
+        .btn-outline:hover {
+
+            background: var(--primary);
+
+            color: white;
+
+        }
+
+ 
+
+        .btn:disabled {
+
+            opacity: 0.5;
+
+            cursor: not-allowed;
+
+        }
+
+ 
+
+        /* Hero Section */
+
+        .hero {
+
+            background: var(--gradient);
+
+            color: white;
+
+            padding: 4rem 0;
+
+            text-align: center;
+
+        }
+
+ 
+
+        .hero h1 {
+
+            font-size: 3rem;
+
+            margin-bottom: 1rem;
+
+            font-weight: 800;
+
+        }
+
+ 
+
+        .hero p {
+
+            font-size: 1.25rem;
+
+            opacity: 0.9;
+
+            max-width: 600px;
+
+            margin: 0 auto 2rem;
+
+        }
+
+ 
+
+        .badge {
+
+            display: inline-block;
+
+            padding: 0.5rem 1rem;
+
+            background: rgba(255,255,255,0.2);
+
+            border-radius: 20px;
+
+            font-size: 0.875rem;
+
+            margin-bottom: 2rem;
+
+            backdrop-filter: blur(10px);
+
+        }
+
+ 
+
+        /* Stats Section */
+
+        .stats {
+
+            background: white;
+
+            padding: 2rem 0;
+
+            margin-top: -2rem;
+
+            border-radius: 12px;
+
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+
+        }
+
+ 
+
+        .stats-grid {
+
+            display: grid;
+
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+
+            gap: 2rem;
+
+            text-align: center;
+
+        }
+
+ 
+
+        .stat {
+
+            padding: 1rem;
+
+        }
+
+ 
+
+        .stat-value {
+
+            font-size: 2rem;
+
+            font-weight: 800;
+
+            color: var(--primary);
+
+            margin-bottom: 0.5rem;
+
+        }
+
+ 
+
+        .stat-label {
+
+            color: var(--gray);
+
+            font-size: 0.875rem;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.05em;
+
+        }
+
+ 
+
+        /* Main Content */
+
+        .main {
+
+            padding: 3rem 0;
+
+        }
+
+ 
+
+        .section {
+
+            margin-bottom: 3rem;
+
+        }
+
+ 
+
+        .section-title {
+
+            font-size: 1.75rem;
+
+            font-weight: 700;
+
+            margin-bottom: 1.5rem;
+
+            color: var(--dark);
+
+        }
+
+ 
+
+        .card {
+
+            background: white;
+
+            border-radius: 12px;
+
+            padding: 2rem;
+
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+
+            margin-bottom: 1.5rem;
+
+        }
+
+ 
+
+        .card-title {
+
+            font-size: 1.25rem;
+
+            font-weight: 600;
+
+            margin-bottom: 1rem;
+
+            color: var(--dark);
+
+        }
+
+ 
+
+        /* Wallet Connection */
+
+        .wallet-status {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 0.75rem;
+
+            padding: 1rem;
+
+            background: var(--light);
+
+            border-radius: 8px;
+
+            margin-bottom: 1.5rem;
+
+        }
+
+ 
+
+        .status-indicator {
+
+            width: 12px;
+
+            height: 12px;
+
+            border-radius: 50%;
+
+            background: var(--danger);
+
+        }
+
+ 
+
+        .status-indicator.connected {
+
+            background: var(--secondary);
+
+        }
+
+ 
+
+        .wallet-address {
+
+            font-family: 'Courier New', monospace;
+
+            color: var(--primary);
+
+            font-weight: 600;
+
+        }
+
+ 
+
+        /* Form Elements */
+
+        .form-group {
+
+            margin-bottom: 1.5rem;
+
+        }
+
+ 
+
+        .form-label {
+
+            display: block;
+
+            margin-bottom: 0.5rem;
+
+            font-weight: 600;
+
+            color: var(--dark);
+
+        }
+
+ 
+
+        .form-input {
+
+            width: 100%;
+
+            padding: 0.875rem 1rem;
+
+            border: 2px solid var(--border);
+
+            border-radius: 8px;
+
+            font-size: 1rem;
+
+            transition: border-color 0.2s;
+
+        }
+
+ 
+
+        .form-input:focus {
+
+            outline: none;
+
+            border-color: var(--primary);
+
+        }
+
+ 
+
+        .form-helper {
+
+            font-size: 0.875rem;
+
+            color: var(--gray);
+
+            margin-top: 0.5rem;
+
+        }
+
+ 
+
+        .slider {
+
+            width: 100%;
+
+            height: 8px;
+
+            border-radius: 4px;
+
+            background: var(--border);
+
+            outline: none;
+
+            -webkit-appearance: none;
+
+        }
+
+ 
+
+        .slider::-webkit-slider-thumb {
+
+            -webkit-appearance: none;
+
+            appearance: none;
+
+            width: 24px;
+
+            height: 24px;
+
+            border-radius: 50%;
+
+            background: var(--primary);
+
+            cursor: pointer;
+
+        }
+
+ 
+
+        .slider::-moz-range-thumb {
+
+            width: 24px;
+
+            height: 24px;
+
+            border-radius: 50%;
+
+            background: var(--primary);
+
+            cursor: pointer;
+
+            border: none;
+
+        }
+
+ 
+
+        /* Info Box */
+
+        .info-box {
+
+            background: var(--light);
+
+            border-left: 4px solid var(--primary);
+
+            padding: 1rem;
+
+            border-radius: 4px;
+
+            margin-bottom: 1.5rem;
+
+        }
+
+ 
+
+        .info-box.warning {
+
+            background: #fef3c7;
+
+            border-color: var(--warning);
+
+        }
+
+ 
+
+        .info-box.success {
+
+            background: #d1fae5;
+
+            border-color: var(--secondary);
+
+        }
+
+ 
+
+        /* Weight Display */
+
+        .weight-display {
+
+            display: grid;
+
+            grid-template-columns: repeat(2, 1fr);
+
+            gap: 1rem;
+
+            margin: 1.5rem 0;
+
+        }
+
+ 
+
+        .weight-item {
+
+            padding: 1rem;
+
+            background: var(--light);
+
+            border-radius: 8px;
+
+        }
+
+ 
+
+        .weight-item-label {
+
+            font-size: 0.875rem;
+
+            color: var(--gray);
+
+            margin-bottom: 0.5rem;
+
+        }
+
+ 
+
+        .weight-item-value {
+
+            font-size: 1.5rem;
+
+            font-weight: 700;
+
+            color: var(--primary);
+
+        }
+
+ 
+
+        /* Positions Table */
+
+        .positions-table {
+
+            width: 100%;
+
+            border-collapse: collapse;
+
+        }
+
+ 
+
+        .positions-table th,
+
+        .positions-table td {
+
+            padding: 1rem;
+
+            text-align: left;
+
+            border-bottom: 1px solid var(--border);
+
+        }
+
+ 
+
+        .positions-table th {
+
+            background: var(--light);
+
+            font-weight: 600;
+
+            color: var(--dark);
+
+        }
+
+ 
+
+        .positions-table tr:hover {
+
+            background: var(--light);
+
+        }
+
+ 
+
+        /* Loading Spinner */
+
+        .loading {
+
+            display: inline-block;
+
+            width: 20px;
+
+            height: 20px;
+
+            border: 3px solid rgba(255,255,255,0.3);
+
+            border-radius: 50%;
+
+            border-top-color: white;
+
+            animation: spin 0.8s linear infinite;
+
+        }
+
+ 
+
+        @keyframes spin {
+
+            to { transform: rotate(360deg); }
+
+        }
+
+ 
+
+        /* Alert */
+
+        .alert {
+
+            padding: 1rem;
+
+            border-radius: 8px;
+
+            margin-bottom: 1.5rem;
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 0.75rem;
+
+        }
+
+ 
+
+        .alert-success {
+
+            background: #d1fae5;
+
+            color: #065f46;
+
+        }
+
+ 
+
+        .alert-error {
+
+            background: #fee2e2;
+
+            color: #991b1b;
+
+        }
+
+ 
+
+        .alert-info {
+
+            background: #dbeafe;
+
+            color: #1e40af;
+
+        }
+
+ 
+
+        /* Footer */
+
+        .footer {
+
+            background: var(--dark);
+
+            color: white;
+
+            padding: 3rem 0 2rem;
+
+            margin-top: 4rem;
+
+        }
+
+ 
+
+        .footer-grid {
+
+            display: grid;
+
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+
+            gap: 2rem;
+
+            margin-bottom: 2rem;
+
+        }
+
+ 
+
+        .footer-title {
+
+            font-weight: 700;
+
+            margin-bottom: 1rem;
+
+        }
+
+ 
+
+        .footer-links {
+
+            list-style: none;
+
+        }
+
+ 
+
+        .footer-links li {
+
+            margin-bottom: 0.5rem;
+
+        }
+
+ 
+
+        .footer-links a {
+
+            color: var(--gray);
+
+            text-decoration: none;
+
+            transition: color 0.2s;
+
+        }
+
+ 
+
+        .footer-links a:hover {
+
+            color: white;
+
+        }
+
+ 
+
+        .footer-bottom {
+
+            text-align: center;
+
+            padding-top: 2rem;
+
+            border-top: 1px solid var(--dark-light);
+
+            color: var(--gray);
+
+        }
+
+ 
+
+        /* Responsive */
+
+        @media (max-width: 768px) {
+
+            .hero h1 {
+
+                font-size: 2rem;
+
+            }
+
+ 
+
+            .nav-links {
+
+                display: none;
+
+            }
+
+ 
+
+            .weight-display {
+
+                grid-template-columns: 1fr;
+
+            }
+
+ 
+
+            .stats-grid {
+
+                grid-template-columns: 1fr;
+
+            }
+
+ 
+
+            .positions-table {
+
+                font-size: 0.875rem;
+
+            }
+
+        }
+
+ 
+
+        .hidden {
+
+            display: none;
+
+        }
+
+ 
+
+        /* Tab Navigation */
+
+        .tabs {
+
+            display: flex;
+
+            gap: 1rem;
+
+            margin-bottom: 2rem;
+
+            border-bottom: 2px solid var(--border);
+
+        }
+
+ 
+
+        .tab {
+
+            padding: 1rem 1.5rem;
+
+            background: transparent;
+
+            border: none;
+
+            font-weight: 600;
+
+            color: var(--gray);
+
+            cursor: pointer;
+
+            position: relative;
+
+            transition: color 0.2s;
+
+        }
+
+ 
+
+        .tab.active {
+
+            color: var(--primary);
+
+        }
+
+ 
+
+        .tab.active::after {
+
+            content: '';
+
+            position: absolute;
+
+            bottom: -2px;
+
+            left: 0;
+
+            right: 0;
+
+            height: 2px;
+
+            background: var(--primary);
+
+        }
+
+ 
+
+        .tab-content {
+
+            display: none;
+
+        }
+
+ 
+
+        .tab-content.active {
+
+            display: block;
+
+        }
+
+ 
+
+        /* Feature badges */
+
+        .feature-badge {
+
+            display: inline-block;
+
+            padding: 0.25rem 0.5rem;
+
+            background: var(--secondary);
+
+            color: white;
+
+            border-radius: 4px;
+
+            font-size: 0.75rem;
+
+            font-weight: 600;
+
+            margin-left: 0.5rem;
+
+        }
+
+ 
+
+        .feature-badge.warning {
+
+            background: var(--warning);
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <!-- Header -->
+
+    <header class="header">
+
+        <div class="container">
+
+            <nav class="nav">
+
+                <a href="#" class="logo">
+
+                    <div class="logo-icon">💎</div>
+
+                    <span>DMD Protocol</span>
+
+                </a>
+
+                <div class="nav-links">
+
+                    <a href="#lock" class="nav-link">Lock</a>
+
+                    <a href="#positions" class="nav-link">My Positions</a>
+
+                    <a href="#rewards" class="nav-link">Rewards</a>
+
+                    <a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/WHITEPAPER.md" class="nav-link" target="_blank">Docs</a>
+
+                    <button id="connectWallet" class="btn btn-primary">Connect Wallet</button>
+
+                </div>
+
+            </nav>
+
+        </div>
+
+    </header>
+
+ 
+
+    <!-- Hero -->
+
+    <section class="hero">
+
+        <div class="container">
+
+            <div class="badge">
+
+                🔒 Fully Decentralized · No Owner/Admin · tBTC-Only · Flash Loan Protected
+
+            </div>
+
+            <h1>Lock tBTC, Earn DMD Rewards</h1>
+
+            <p>Fully decentralized, immutable protocol on Base. Time-weighted rewards up to 1.48x. 7-day warmup + 3-day vesting for flash loan protection. Zero governance risk.</p>
+
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+
+                <button class="btn btn-primary" onclick="document.getElementById('lock').scrollIntoView({behavior: 'smooth'})">
+
+                    Start Locking
+
+                </button>
+
+                <a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/NEXUS_SECURITY_AUDIT.md" target="_blank" class="btn btn-outline">
+
+                    View Audit
+
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+ 
+
+    <!-- Stats -->
+
+    <div class="container">
+
+        <div class="stats">
+
+            <div class="stats-grid">
+
+                <div class="stat">
+
+                    <div class="stat-value" id="totalLocked">0</div>
+
+                    <div class="stat-label">Total tBTC Locked</div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-value" id="totalWeight">0</div>
+
+                    <div class="stat-label">Total Vested Weight</div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-value" id="currentEpoch">0</div>
+
+                    <div class="stat-label">Current Epoch (7 days)</div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-value">18M</div>
+
+                    <div class="stat-label">Max Supply DMD</div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+ 
+
+    <!-- Main Content -->
+
+    <main class="main">
+
+        <div class="container">
+
+            <!-- Wallet Status -->
+
+            <div id="walletStatus" class="card">
+
+                <div class="wallet-status">
+
+                    <div class="status-indicator" id="statusIndicator"></div>
+
+                    <div>
+
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">
+
+                            <span id="connectionStatus">Not Connected</span>
+
+                        </div>
+
+                        <div id="walletAddressDisplay" class="wallet-address" style="display: none;"></div>
+
+                    </div>
+
+                </div>
+
+ 
+
+                <div id="networkWarning" class="alert alert-error" style="display: none;">
+
+                    Wrong network! Please switch to Base Mainnet (Chain ID: 8453)
+
+                </div>
+
+ 
+
+                <div id="web3Status" class="alert alert-info" style="display: none;">
+
+                    <span id="web3StatusMessage">Checking Web3 availability...</span>
+
+                </div>
+
+ 
+
+                <div id="balanceInfo" style="display: none;">
+
+                    <div class="weight-display">
+
+                        <div class="weight-item">
+
+                            <div class="weight-item-label">Your tBTC Balance</div>
+
+                            <div class="weight-item-value" id="tbtcBalance">0</div>
+
+                        </div>
+
+                        <div class="weight-item">
+
+                            <div class="weight-item-label">Your DMD Balance</div>
+
+                            <div class="weight-item-value" id="dmdBalance">0</div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+ 
+
+            <!-- Tabs -->
+
+            <div class="tabs">
+
+                <button class="tab active" onclick="switchTab('lock')">🔒 Lock tBTC</button>
+
+                <button class="tab" onclick="switchTab('positions')">📊 My Positions</button>
+
+                <button class="tab" onclick="switchTab('rewards')">🎁 Claim Rewards</button>
+
+            </div>
+
+ 
+
+            <!-- Lock Tab -->
+
+            <div id="lockTab" class="tab-content active">
+
+                <div class="card">
+
+                    <h2 class="card-title">Lock tBTC to Earn DMD</h2>
+
+ 
+
+                    <div class="info-box">
+
+                        <strong>How it works:</strong> Lock your tBTC for 1-120 months. Longer locks get higher weight multipliers (up to 1.48x at 24+ months). Your weight vests over <strong>10 days</strong> (7-day warmup + 3-day linear vesting) to prevent flash loan attacks.
+
+                    </div>
+
+ 
+
+                    <div class="info-box success">
+
+                        <strong>Fully Decentralized:</strong> No owner, no admin, no governance. Once deployed, the protocol is completely immutable. Only accepts tBTC on Base chain.
+
+                    </div>
+
+ 
+
+                    <form id="lockForm">
+
+                        <div class="form-group">
+
+                            <label class="form-label">Amount (tBTC)</label>
+
+                            <input
+
+                                type="number"
+
+                                id="lockAmount"
+
+                                class="form-input"
+
+                                placeholder="0.0"
+
+                                step="0.000000000000000001"
+
+                                min="0"
+
+                                oninput="calculateWeight()"
+
+                            >
+
+                            <div class="form-helper">Available: <span id="availableBalance">0</span> tBTC (18 decimals)</div>
+
+                        </div>
+
+ 
+
+                        <div class="form-group">
+
+                            <label class="form-label">
+
+                                Lock Duration: <span id="lockMonthsDisplay">12</span> months
+
+                            </label>
+
+                            <input
+
+                                type="range"
+
+                                id="lockMonths"
+
+                                class="slider"
+
+                                min="1"
+
+                                max="120"
+
+                                value="12"
+
+                                oninput="updateDuration(); calculateWeight()"
+
+                            >
+
+                            <div class="form-helper">
+
+                                Min: 1 month · Max: 120 months (10 years) · Max weight bonus at 24 months (1.48x)
+
+                            </div>
+
+                        </div>
+
+ 
+
+                        <div class="weight-display">
+
+                            <div class="weight-item">
+
+                                <div class="weight-item-label">Weight Multiplier</div>
+
+                                <div class="weight-item-value" id="weightMultiplier">1.24x</div>
+
+                            </div>
+
+                            <div class="weight-item">
+
+                                <div class="weight-item-label">Total Weight (after vesting)</div>
+
+                                <div class="weight-item-value" id="totalWeightPreview">0</div>
+
+                            </div>
+
+                        </div>
+
+ 
+
+                        <div class="info-box warning">
+
+                            <strong>Important:</strong>
+
+                            <ul style="margin-top: 0.5rem; margin-left: 1rem;">
+
+                                <li>Position locked for full duration. Unlock: <span id="unlockDate">-</span></li>
+
+                                <li>Weight warmup: 7 days (0 weight during this period)</li>
+
+                                <li>Weight vesting: 3 days linear increase after warmup</li>
+
+                                <li>Full weight effective after 10 days total</li>
+
+                            </ul>
+
+                        </div>
+
+ 
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%;" id="lockButton" disabled>
+
+                            Lock tBTC
+
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+ 
+
+            <!-- Positions Tab -->
+
+            <div id="positionsTab" class="tab-content">
+
+                <div class="card">
+
+                    <h2 class="card-title">Your Locked Positions</h2>
+
+ 
+
+                    <div id="positionsLoading" class="info-box">
+
+                        Loading your positions...
+
+                    </div>
+
+ 
+
+                    <div id="noPositions" class="info-box" style="display: none;">
+
+                        You don't have any locked positions yet. Lock some tBTC to get started!
+
+                    </div>
+
+ 
+
+                    <div id="positionsContainer" style="display: none;">
+
+                        <table class="positions-table">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>ID</th>
+
+                                    <th>Amount</th>
+
+                                    <th>Duration</th>
+
+                                    <th>Weight</th>
+
+                                    <th>Vested Weight</th>
+
+                                    <th>Unlock Date</th>
+
+                                    <th>Status</th>
+
+                                    <th>Action</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="positionsTableBody">
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+ 
+
+            <!-- Rewards Tab -->
+
+            <div id="rewardsTab" class="tab-content">
+
+                <div class="card">
+
+                    <h2 class="card-title">Claim DMD Rewards</h2>
+
+ 
+
+                    <div class="weight-display">
+
+                        <div class="weight-item">
+
+                            <div class="weight-item-label">Your Vested Weight</div>
+
+                            <div class="weight-item-value" id="userTotalWeight">0</div>
+
+                        </div>
+
+                        <div class="weight-item">
+
+                            <div class="weight-item-label">Claimable DMD</div>
+
+                            <div class="weight-item-value" id="claimableRewards">0</div>
+
+                        </div>
+
+                    </div>
+
+ 
+
+                    <div class="info-box success" id="rewardsInfo">
+
+                        <strong>Emission Schedule:</strong>
+
+                        <ul style="margin-top: 0.5rem; margin-left: 1rem;">
+
+                            <li>Rewards distributed every 7 days (epoch)</li>
+
+                            <li>Your share is proportional to your <strong>vested</strong> weight</li>
+
+                            <li>Year 1: 3.6M DMD · 18% annual decay · 14.4M cap</li>
+
+                            <li>Emissions auto-started at deployment</li>
+
+                        </ul>
+
+                    </div>
+
+ 
+
+                    <button class="btn btn-secondary" style="width: 100%;" id="claimButton" disabled>
+
+                        Claim All Rewards
+
+                    </button>
+
+                </div>
+
+ 
+
+                <div class="card">
+
+                    <h2 class="card-title">Epoch History</h2>
+
+                    <div id="epochHistory">
+
+                        <div class="info-box">
+
+                            No finalized epochs yet. First epoch finalizes 7 days after deployment.
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+ 
+
+            <!-- Protocol Info -->
+
+            <div class="section">
+
+                <h2 class="section-title">Why DMD Protocol?</h2>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+
+                    <div class="card">
+
+                        <h3 class="card-title">🔒 Fully Decentralized</h3>
+
+                        <p>No owner, no admin, no governance. Zero centralization risk. All parameters immutable after deployment. Code is law.</p>
+
+                    </div>
+
+                    <div class="card">
+
+                        <h3 class="card-title">⚡ Flash Loan Protected</h3>
+
+                        <p>7-day warmup period before weight counts, plus 3-day linear vesting. Impossible to game with flash loans or quick deposits.</p>
+
+                    </div>
+
+                    <div class="card">
+
+                        <h3 class="card-title">💎 tBTC-Only</h3>
+
+                        <p>Only accepts tBTC on Base chain. Single asset focus means simpler, more secure protocol. Immutable token address.</p>
+
+                    </div>
+
+                    <div class="card">
+
+                        <h3 class="card-title">📈 Time-Weighted Rewards</h3>
+
+                        <p>Longer locks earn higher multipliers: 1.02x (1 month) up to 1.48x (24+ months). Fair and transparent distribution.</p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+ 
+
+            <!-- Security Info -->
+
+            <div class="section">
+
+                <h2 class="section-title">Security Features</h2>
+
+                <div class="card">
+
+                    <table class="positions-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Feature</th>
+
+                                <th>Protection</th>
+
+                                <th>Status</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <tr>
+
+                                <td>Flash Loan Attacks</td>
+
+                                <td>7-day warmup + 3-day vesting period</td>
+
+                                <td><span class="feature-badge">Protected</span></td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>Reentrancy</td>
+
+                                <td>CEI pattern throughout all contracts</td>
+
+                                <td><span class="feature-badge">Protected</span></td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>Admin Abuse</td>
+
+                                <td>No owner, admin, or governance</td>
+
+                                <td><span class="feature-badge">Eliminated</span></td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>Upgrade Risk</td>
+
+                                <td>Fully immutable contracts</td>
+
+                                <td><span class="feature-badge">Eliminated</span></td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>Token Risk</td>
+
+                                <td>tBTC-only, hardcoded address</td>
+
+                                <td><span class="feature-badge">Minimized</span></td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>Emission Cap</td>
+
+                                <td>Hard cap at 14.4M DMD</td>
+
+                                <td><span class="feature-badge">Enforced</span></td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+ 
+
+    <!-- Footer -->
+
+    <footer class="footer">
+
+        <div class="container">
+
+            <div class="footer-grid">
+
+                <div>
+
+                    <div class="footer-title">DMD Protocol v1.8.8</div>
+
+                    <p style="color: var(--gray); margin-bottom: 1rem;">
+
+                        Fully decentralized tBTC locking protocol on Base. No owner, no admin, no governance. Immutable.
+
+                    </p>
+
+                    <div style="color: var(--gray);">
+
+                        Flash Loan Protection: 7d warmup + 3d vesting
+
+                    </div>
+
+                </div>
+
+                <div>
+
+                    <div class="footer-title">Resources</div>
+
+                    <ul class="footer-links">
+
+                        <li><a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/WHITEPAPER.md" target="_blank">Whitepaper</a></li>
+
+                        <li><a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/NEXUS_SECURITY_AUDIT.md" target="_blank">Security Audit</a></li>
+
+                        <li><a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/RED_TEAM_ATTACK_REPORT.md" target="_blank">Red Team Report</a></li>
+
+                        <li><a href="https://github.com/dedrxyz-DMD/dmd-protocol-1.8.8/blob/main/DEPLOYMENT.md" target="_blank">Deployment Guide</a></li>
+
+                    </ul>
+
+                </div>
+
+                <div>
+
+                    <div class="footer-title">Contract Addresses</div>
+
+                    <ul class="footer-links">
+
+                        <li>tBTC: <code>0x236a...794b</code></li>
+
+                        <li>DMDToken: <code>TBD</code></li>
+
+                        <li>BTCReserveVault: <code>TBD</code></li>
+
+                        <li>MintDistributor: <code>TBD</code></li>
+
+                        <li>RedemptionEngine: <code>TBD</code></li>
+
+                    </ul>
+
+                </div>
+
+                <div>
+
+                    <div class="footer-title">Network</div>
+
+                    <ul class="footer-links">
+
+                        <li>Chain: Base Mainnet</li>
+
+                        <li>Chain ID: 8453</li>
+
+                        <li>tBTC: 18 decimals</li>
+
+                        <li>Explorer: Basescan</li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+            <div class="footer-bottom">
+
+                <p>&copy; 2025 DMD Protocol. Fully decentralized and immutable. No governance, no rights reserved.</p>
+
+                <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+
+                    Experimental DeFi protocol. Use at your own risk. Review audit reports and red team analysis before using.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </footer>
+
+ 
+
+    <script>
+
+        // Configuration - DMD Protocol v1.8.8
+
+        const CONFIG = {
+
+            CHAIN_ID: 8453, // Base Mainnet
+
+            CHAIN_NAME: 'Base',
+
+            RPC_URL: 'https://mainnet.base.org',
+
+            EXPLORER_URL: 'https://basescan.org',
+
+ 
+
+            // Contract Addresses (UPDATE AFTER DEPLOYMENT)
+
+            TBTC_ADDRESS: '0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b',
+
+            DMD_TOKEN_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+
+            VAULT_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+
+            DISTRIBUTOR_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+
+            REDEMPTION_ADDRESS: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+
+ 
+
+            // Protocol constants
+
+            WEIGHT_WARMUP_PERIOD: 7 * 24 * 60 * 60, // 7 days in seconds
+
+            WEIGHT_VESTING_PERIOD: 3 * 24 * 60 * 60, // 3 days in seconds
+
+            EPOCH_DURATION: 7 * 24 * 60 * 60, // 7 days in seconds
+
+            MAX_WEIGHT_MONTHS: 24,
+
+            WEIGHT_PER_MONTH: 0.02, // 2% per month
+
+        };
+
+ 
+
+        // ABIs (Minimal for UI)
+
+        const ERC20_ABI = [
+
+            {
+
+                "constant": true,
+
+                "inputs": [{"name": "_owner", "type": "address"}],
+
+                "name": "balanceOf",
+
+                "outputs": [{"name": "balance", "type": "uint256"}],
+
+                "type": "function"
+
+            },
+
+            {
+
+                "constant": false,
+
+                "inputs": [
+
+                    {"name": "_spender", "type": "address"},
+
+                    {"name": "_value", "type": "uint256"}
+
+                ],
+
+                "name": "approve",
+
+                "outputs": [{"name": "", "type": "bool"}],
+
+                "type": "function"
+
+            }
+
+        ];
+
+ 
+
+        const VAULT_ABI = [
+
+            {
+
+                "inputs": [
+
+                    {"name": "amount", "type": "uint256"},
+
+                    {"name": "lockMonths", "type": "uint256"}
+
+                ],
+
+                "name": "lock",
+
+                "outputs": [{"name": "positionId", "type": "uint256"}],
+
+                "stateMutability": "nonpayable",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [],
+
+                "name": "totalLocked",
+
+                "outputs": [{"name": "", "type": "uint256"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [],
+
+                "name": "totalSystemWeight",
+
+                "outputs": [{"name": "", "type": "uint256"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [{"name": "user", "type": "address"}],
+
+                "name": "positionCount",
+
+                "outputs": [{"name": "", "type": "uint256"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [{"name": "user", "type": "address"}],
+
+                "name": "getVestedWeight",
+
+                "outputs": [{"name": "", "type": "uint256"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [
+
+                    {"name": "user", "type": "address"},
+
+                    {"name": "positionId", "type": "uint256"}
+
+                ],
+
+                "name": "getPosition",
+
+                "outputs": [
+
+                    {"name": "amount", "type": "uint256"},
+
+                    {"name": "lockMonths", "type": "uint256"},
+
+                    {"name": "unlockTime", "type": "uint256"},
+
+                    {"name": "weight", "type": "uint256"}
+
+                ],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [
+
+                    {"name": "user", "type": "address"},
+
+                    {"name": "positionId", "type": "uint256"}
+
+                ],
+
+                "name": "getPositionVestedWeight",
+
+                "outputs": [{"name": "", "type": "uint256"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [
+
+                    {"name": "user", "type": "address"},
+
+                    {"name": "positionId", "type": "uint256"}
+
+                ],
+
+                "name": "isUnlocked",
+
+                "outputs": [{"name": "", "type": "bool"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [
+
+                    {"name": "user", "type": "address"},
+
+                    {"name": "positionId", "type": "uint256"}
+
+                ],
+
+                "name": "isWeightFullyVested",
+
+                "outputs": [{"name": "", "type": "bool"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            },
+
+            {
+
+                "inputs": [],
+
+                "name": "TBTC",
+
+                "outputs": [{"name": "", "type": "address"}],
+
+                "stateMutability": "view",
+
+                "type": "function"
+
+            }
+
+        ];
+
+ 
+
+        // State
+
+        let web3;
+
+        let userAccount;
+
+        let tbtcContract;
+
+        let vaultContract;
+
+        let dmdContract;
+
+ 
+
+        // Initialize
+
+        window.addEventListener('load', async () => {
+
+            console.log('DMD Protocol v1.8.8 - Initializing...');
+
+ 
+
+            const statusDiv = document.getElementById('web3Status');
+
+            const statusMsg = document.getElementById('web3StatusMessage');
+
+ 
+
+            // Check if Web3 library loaded
+
+            if (typeof Web3 === 'undefined') {
+
+                console.error('Web3 library failed to load!');
+
+                statusDiv.style.display = 'block';
+
+                statusMsg.textContent = 'Web3 library failed to load. Please refresh the page.';
+
+                statusDiv.className = 'alert alert-error';
+
+                return;
+
+            }
+
+            console.log('Web3 library loaded successfully');
+
+ 
+
+            // Check MetaMask availability
+
+            if (typeof window.ethereum === 'undefined') {
+
+                console.warn('No Web3 wallet detected');
+
+                statusDiv.style.display = 'block';
+
+                statusMsg.innerHTML = 'No Web3 wallet detected. Please install <a href="https://metamask.io" target="_blank" style="color: inherit; text-decoration: underline;">MetaMask</a> to use this dApp.';
+
+            } else {
+
+                console.log('Web3 wallet detected');
+
+            }
+
+ 
+
+            await checkWalletConnection();
+
+            updateDuration();
+
+            calculateWeight();
+
+ 
+
+            // Setup event listeners
+
+            const connectButton = document.getElementById('connectWallet');
+
+            if (connectButton) {
+
+                console.log('Connect button found, attaching event listener');
+
+                connectButton.disabled = false;
+
+                connectButton.style.pointerEvents = 'auto';
+
+                connectButton.style.opacity = '1';
+
+ 
+
+                connectButton.addEventListener('click', (e) => {
+
+                    console.log('Connect button clicked');
+
+                    e.preventDefault();
+
+                    e.stopPropagation();
+
+                    connectWallet();
+
+                });
+
+            }
+
+ 
+
+            const lockForm = document.getElementById('lockForm');
+
+            if (lockForm) {
+
+                lockForm.addEventListener('submit', async (e) => {
+
+                    e.preventDefault();
+
+                    await lockTBTC();
+
+                });
+
+            }
+
+ 
+
+            console.log('Initialization complete');
+
+        });
+
+ 
+
+        async function connectWallet() {
+
+            try {
+
+                console.log('Connecting wallet...');
+
+ 
+
+                if (typeof window.ethereum !== 'undefined') {
+
+                    const accounts = await window.ethereum.request({
+
+                        method: 'eth_requestAccounts'
+
+                    });
+
+ 
+
+                    console.log('Accounts received:', accounts);
+
+                    userAccount = accounts[0];
+
+                    web3 = new Web3(window.ethereum);
+
+ 
+
+                    // Check network
+
+                    const chainId = await web3.eth.getChainId();
+
+                    console.log('Current chain ID:', chainId);
+
+                    if (chainId !== CONFIG.CHAIN_ID) {
+
+                        console.log('Wrong network, switching to Base...');
+
+                        await switchToBase();
+
+                        return;
+
+                    }
+
+ 
+
+                    // Initialize contracts
+
+                    console.log('Initializing contracts...');
+
+                    await initializeContracts();
+
+ 
+
+                    // Update UI
+
+                    console.log('Updating UI...');
+
+                    updateWalletUI(true);
+
+                    await loadUserData();
+
+ 
+
+                    console.log('Wallet connected successfully!');
+
+                    alert('Wallet connected successfully!');
+
+ 
+
+                    // Listen for changes
+
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+                    window.ethereum.on('chainChanged', () => window.location.reload());
+
+ 
+
+                } else {
+
+                    console.error('No Web3 provider found');
+
+                    alert('Please install MetaMask or another Web3 wallet!');
+
+                }
+
+            } catch (error) {
+
+                console.error('Failed to connect wallet:', error);
+
+                alert('Failed to connect wallet: ' + error.message);
+
+            }
+
+        }
+
+ 
+
+        async function switchToBase() {
+
+            try {
+
+                await window.ethereum.request({
+
+                    method: 'wallet_switchEthereumChain',
+
+                    params: [{ chainId: '0x' + CONFIG.CHAIN_ID.toString(16) }],
+
+                });
+
+                await connectWallet();
+
+            } catch (error) {
+
+                if (error.code === 4902) {
+
+                    await window.ethereum.request({
+
+                        method: 'wallet_addEthereumChain',
+
+                        params: [{
+
+                            chainId: '0x' + CONFIG.CHAIN_ID.toString(16),
+
+                            chainName: 'Base',
+
+                            nativeCurrency: {
+
+                                name: 'Ethereum',
+
+                                symbol: 'ETH',
+
+                                decimals: 18
+
+                            },
+
+                            rpcUrls: [CONFIG.RPC_URL],
+
+                            blockExplorerUrls: [CONFIG.EXPLORER_URL]
+
+                        }]
+
+                    });
+
+                    await connectWallet();
+
+                }
+
+            }
+
+        }
+
+ 
+
+        async function checkWalletConnection() {
+
+            if (typeof window.ethereum !== 'undefined') {
+
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+
+                if (accounts.length > 0) {
+
+                    userAccount = accounts[0];
+
+                    web3 = new Web3(window.ethereum);
+
+                    await initializeContracts();
+
+                    updateWalletUI(true);
+
+                    await loadUserData();
+
+                }
+
+            }
+
+        }
+
+ 
+
+        async function initializeContracts() {
+
+            tbtcContract = new web3.eth.Contract(ERC20_ABI, CONFIG.TBTC_ADDRESS);
+
+ 
+
+            if (CONFIG.VAULT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+
+                vaultContract = new web3.eth.Contract(VAULT_ABI, CONFIG.VAULT_ADDRESS);
+
+            }
+
+            if (CONFIG.DMD_TOKEN_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+
+                dmdContract = new web3.eth.Contract(ERC20_ABI, CONFIG.DMD_TOKEN_ADDRESS);
+
+            }
+
+        }
+
+ 
+
+        function updateWalletUI(connected) {
+
+            const statusIndicator = document.getElementById('statusIndicator');
+
+            const connectionStatus = document.getElementById('connectionStatus');
+
+            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+
+            const balanceInfo = document.getElementById('balanceInfo');
+
+            const connectButton = document.getElementById('connectWallet');
+
+            const lockButton = document.getElementById('lockButton');
+
+ 
+
+            if (connected) {
+
+                statusIndicator.classList.add('connected');
+
+                connectionStatus.textContent = 'Connected';
+
+                walletAddressDisplay.textContent = shortenAddress(userAccount);
+
+                walletAddressDisplay.style.display = 'block';
+
+                balanceInfo.style.display = 'block';
+
+                connectButton.textContent = 'Connected';
+
+                connectButton.disabled = true;
+
+                lockButton.disabled = false;
+
+            } else {
+
+                statusIndicator.classList.remove('connected');
+
+                connectionStatus.textContent = 'Not Connected';
+
+                walletAddressDisplay.style.display = 'none';
+
+                balanceInfo.style.display = 'none';
+
+                connectButton.textContent = 'Connect Wallet';
+
+                connectButton.disabled = false;
+
+                lockButton.disabled = true;
+
+            }
+
+        }
+
+ 
+
+        async function loadUserData() {
+
+            try {
+
+                // Load tBTC balance
+
+                const tbtcBalance = await tbtcContract.methods.balanceOf(userAccount).call();
+
+                document.getElementById('tbtcBalance').textContent = formatAmount(tbtcBalance);
+
+                document.getElementById('availableBalance').textContent = formatAmount(tbtcBalance);
+
+ 
+
+                // Load DMD balance if contract is deployed
+
+                if (dmdContract) {
+
+                    const dmdBalance = await dmdContract.methods.balanceOf(userAccount).call();
+
+                    document.getElementById('dmdBalance').textContent = formatAmount(dmdBalance);
+
+                }
+
+ 
+
+                // Load protocol stats if vault is deployed
+
+                if (vaultContract) {
+
+                    const totalLocked = await vaultContract.methods.totalLocked().call();
+
+                    const totalWeight = await vaultContract.methods.totalSystemWeight().call();
+
+ 
+
+                    document.getElementById('totalLocked').textContent = formatAmount(totalLocked);
+
+                    document.getElementById('totalWeight').textContent = formatAmount(totalWeight);
+
+ 
+
+                    // Load user vested weight
+
+                    const userVestedWeight = await vaultContract.methods.getVestedWeight(userAccount).call();
+
+                    document.getElementById('userTotalWeight').textContent = formatAmount(userVestedWeight);
+
+ 
+
+                    // Load user positions
+
+                    await loadPositions();
+
+                }
+
+            } catch (error) {
+
+                console.error('Error loading user data:', error);
+
+            }
+
+        }
+
+ 
+
+        async function loadPositions() {
+
+            try {
+
+                const positionCount = await vaultContract.methods.positionCount(userAccount).call();
+
+                const tbody = document.getElementById('positionsTableBody');
+
+                tbody.innerHTML = '';
+
+ 
+
+                if (positionCount == 0) {
+
+                    document.getElementById('noPositions').style.display = 'block';
+
+                    document.getElementById('positionsContainer').style.display = 'none';
+
+                    document.getElementById('positionsLoading').style.display = 'none';
+
+                    return;
+
+                }
+
+ 
+
+                document.getElementById('noPositions').style.display = 'none';
+
+                document.getElementById('positionsContainer').style.display = 'block';
+
+                document.getElementById('positionsLoading').style.display = 'none';
+
+ 
+
+                for (let i = 0; i < positionCount; i++) {
+
+                    const position = await vaultContract.methods.getPosition(userAccount, i).call();
+
+                    const isUnlocked = await vaultContract.methods.isUnlocked(userAccount, i).call();
+
+                    const vestedWeight = await vaultContract.methods.getPositionVestedWeight(userAccount, i).call();
+
+                    const isFullyVested = await vaultContract.methods.isWeightFullyVested(userAccount, i).call();
+
+ 
+
+                    let vestingStatus = '';
+
+                    if (position.amount == 0) {
+
+                        vestingStatus = '⚫ Redeemed';
+
+                    } else if (isFullyVested) {
+
+                        vestingStatus = '🟢 Fully Vested';
+
+                    } else if (vestedWeight > 0) {
+
+                        vestingStatus = '🟡 Vesting';
+
+                    } else {
+
+                        vestingStatus = '⏳ Warmup';
+
+                    }
+
+ 
+
+                    const row = tbody.insertRow();
+
+                    row.innerHTML = `
+
+                        <td>#${i}</td>
+
+                        <td>${formatAmount(position.amount)} tBTC</td>
+
+                        <td>${position.lockMonths} months</td>
+
+                        <td>${formatAmount(position.weight)}</td>
+
+                        <td>${formatAmount(vestedWeight)}</td>
+
+                        <td>${new Date(position.unlockTime * 1000).toLocaleDateString()}</td>
+
+                        <td>${vestingStatus} ${isUnlocked ? '· 🔓' : '· 🔒'}</td>
+
+                        <td>
+
+                            ${isUnlocked && position.amount > 0 ? '<button class="btn btn-secondary" onclick="redeemPosition(' + i + ')">Redeem</button>' : '-'}
+
+                        </td>
+
+                    `;
+
+                }
+
+            } catch (error) {
+
+                console.error('Error loading positions:', error);
+
+            }
+
+        }
+
+ 
+
+        async function lockTBTC() {
+
+            try {
+
+                const amount = document.getElementById('lockAmount').value;
+
+                const months = document.getElementById('lockMonths').value;
+
+ 
+
+                if (!amount || amount <= 0) {
+
+                    alert('Please enter a valid amount');
+
+                    return;
+
+                }
+
+ 
+
+                if (!vaultContract) {
+
+                    alert('Contracts not deployed yet. Please check back after deployment.');
+
+                    return;
+
+                }
+
+ 
+
+                const amountWei = web3.utils.toWei(amount, 'ether');
+
+                const lockButton = document.getElementById('lockButton');
+
+ 
+
+                lockButton.disabled = true;
+
+                lockButton.innerHTML = '<span class="loading"></span> Processing...';
+
+ 
+
+                // Step 1: Approve tBTC
+
+                await tbtcContract.methods.approve(CONFIG.VAULT_ADDRESS, amountWei).send({
+
+                    from: userAccount
+
+                });
+
+ 
+
+                // Step 2: Lock
+
+                await vaultContract.methods.lock(amountWei, months).send({
+
+                    from: userAccount
+
+                });
+
+ 
+
+                alert('Success! Your tBTC has been locked.\n\nNote: Your weight will be 0 during the 7-day warmup period, then vest linearly over 3 days.');
+
+ 
+
+                await loadUserData();
+
+ 
+
+                document.getElementById('lockForm').reset();
+
+                updateDuration();
+
+                calculateWeight();
+
+ 
+
+            } catch (error) {
+
+                console.error('Lock failed:', error);
+
+                alert('Transaction failed: ' + error.message);
+
+            } finally {
+
+                const lockButton = document.getElementById('lockButton');
+
+                lockButton.disabled = false;
+
+                lockButton.textContent = 'Lock tBTC';
+
+            }
+
+        }
+
+ 
+
+        // Calculations
+
+        function updateDuration() {
+
+            const months = document.getElementById('lockMonths').value;
+
+            document.getElementById('lockMonthsDisplay').textContent = months;
+
+ 
+
+            const unlockDate = new Date();
+
+            unlockDate.setMonth(unlockDate.getMonth() + parseInt(months));
+
+            document.getElementById('unlockDate').textContent = unlockDate.toLocaleDateString();
+
+        }
+
+ 
+
+        function calculateWeight() {
+
+            const amount = parseFloat(document.getElementById('lockAmount').value) || 0;
+
+            const months = parseInt(document.getElementById('lockMonths').value);
+
+ 
+
+            // Weight formula: 1.0 + min(months, 24) * 0.02
+
+            const effectiveMonths = Math.min(months, CONFIG.MAX_WEIGHT_MONTHS);
+
+            const multiplier = 1.0 + (effectiveMonths * CONFIG.WEIGHT_PER_MONTH);
+
+            const weight = amount * multiplier;
+
+ 
+
+            document.getElementById('weightMultiplier').textContent = multiplier.toFixed(2) + 'x';
+
+            document.getElementById('totalWeightPreview').textContent = weight.toFixed(6);
+
+        }
+
+ 
+
+        // Tab switching
+
+        function switchTab(tabName) {
+
+            document.querySelectorAll('.tab').forEach(tab => {
+
+                tab.classList.remove('active');
+
+            });
+
+            event.target.classList.add('active');
+
+ 
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+
+                content.classList.remove('active');
+
+            });
+
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+ 
+
+            if (tabName === 'positions' && userAccount) {
+
+                loadPositions();
+
+            }
+
+        }
+
+ 
+
+        // Helpers
+
+        function shortenAddress(address) {
+
+            return address.slice(0, 6) + '...' + address.slice(-4);
+
+        }
+
+ 
+
+        function formatAmount(wei) {
+
+            return parseFloat(web3.utils.fromWei(wei.toString(), 'ether')).toFixed(6);
+
+        }
+
+ 
+
+        function handleAccountsChanged(accounts) {
+
+            if (accounts.length === 0) {
+
+                updateWalletUI(false);
+
+                userAccount = null;
+
+            } else if (accounts[0] !== userAccount) {
+
+                userAccount = accounts[0];
+
+                updateWalletUI(true);
+
+                loadUserData();
+
+            }
+
+        }
+
+ 
+
+        async function redeemPosition(positionId) {
+
+            try {
+
+                if (!CONFIG.REDEMPTION_ADDRESS || CONFIG.REDEMPTION_ADDRESS === '0x0000000000000000000000000000000000000000') {
+
+                    alert('Redemption contract not deployed yet. Please check back after deployment.');
+
+                    return;
+
+                }
+
+ 
+
+                alert('Redemption requires burning DMD tokens equal to position weight.\n\nPlease use the RedemptionEngine contract directly.');
+
+            } catch (error) {
+
+                console.error('Redemption failed:', error);
+
+                alert('Redemption failed: ' + error.message);
+
+            }
+
+        }
+
+    </script>
+
+</body>
+
+</html>
