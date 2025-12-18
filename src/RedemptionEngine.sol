@@ -6,7 +6,8 @@ import "./interfaces/IBTCReserveVault.sol";
 
 /**
  * @title RedemptionEngine
- * @notice Burns DMD to unlock BTC from reserve vault
+ * @notice Burns DMD to unlock tBTC from reserve vault
+ * @dev Fully decentralized - no owner, no admin, no governance
  * @dev Enforces burn-to-redeem mechanism, position-based unlocking
  */
 contract RedemptionEngine {
@@ -40,7 +41,7 @@ contract RedemptionEngine {
     event Redeemed(
         address indexed user,
         uint256 indexed positionId,
-        uint256 btcAmount,
+        uint256 tbtcAmount,
         uint256 dmdBurned
     );
 
@@ -61,7 +62,7 @@ contract RedemptionEngine {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Burn DMD to unlock BTC from specific position
+     * @notice Burn DMD to unlock tBTC from specific position
      * @param positionId Position identifier in vault
      * @param dmdAmount Amount of DMD to burn (must cover position weight)
      * @dev User must have unlocked position and sufficient DMD balance
@@ -72,14 +73,13 @@ contract RedemptionEngine {
 
         // Get position details from vault
         (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
+            uint256 tbtcAmount,
             ,  // lockMonths (skip)
             ,  // unlockTime (skip)
             uint256 weight
         ) = vault.getPosition(msg.sender, positionId);
 
-        if (btcAmount == 0) revert PositionNotFound();
+        if (tbtcAmount == 0) revert PositionNotFound();
         if (!vault.isUnlocked(msg.sender, positionId)) revert PositionLocked();
 
         // Require burn amount >= position weight
@@ -93,10 +93,10 @@ contract RedemptionEngine {
         dmdToken.transferFrom(msg.sender, address(this), dmdAmount);
         dmdToken.burn(dmdAmount);
 
-        // Unlock BTC from vault
+        // Unlock tBTC from vault
         vault.redeem(msg.sender, positionId);
 
-        emit Redeemed(msg.sender, positionId, btcAmount, dmdAmount);
+        emit Redeemed(msg.sender, positionId, tbtcAmount, dmdAmount);
     }
 
     /**
@@ -112,6 +112,7 @@ contract RedemptionEngine {
 
         uint256 totalBurn = 0;
 
+        // First pass: validate and accumulate
         for (uint256 i = 0; i < positionIds.length; i++) {
             uint256 positionId = positionIds[i];
             uint256 dmdAmount = dmdAmounts[i];
@@ -120,29 +121,42 @@ contract RedemptionEngine {
             if (redeemed[msg.sender][positionId]) continue;
 
             (
-                ,  // btcAsset (skip)
-                uint256 btcAmount,
+                uint256 tbtcAmount,
                 ,  // lockMonths (skip)
                 ,  // unlockTime (skip)
                 uint256 weight
             ) = vault.getPosition(msg.sender, positionId);
 
-            if (btcAmount == 0) continue;
+            if (tbtcAmount == 0) continue;
             if (!vault.isUnlocked(msg.sender, positionId)) continue;
             if (dmdAmount < weight) continue;
 
             redeemed[msg.sender][positionId] = true;
             totalBurn += dmdAmount;
-
-            vault.redeem(msg.sender, positionId);
-
-            emit Redeemed(msg.sender, positionId, btcAmount, dmdAmount);
         }
 
+        // Transfer and burn DMD first (atomic)
         if (totalBurn > 0) {
             totalBurnedByUser[msg.sender] += totalBurn;
             dmdToken.transferFrom(msg.sender, address(this), totalBurn);
             dmdToken.burn(totalBurn);
+        }
+
+        // Second pass: redeem from vault
+        for (uint256 i = 0; i < positionIds.length; i++) {
+            uint256 positionId = positionIds[i];
+
+            // Only process if we marked it as redeemed in first pass
+            if (!redeemed[msg.sender][positionId]) continue;
+
+            (uint256 tbtcAmount,,,) = vault.getPosition(msg.sender, positionId);
+
+            // Skip if already processed by vault (amount would be 0)
+            if (tbtcAmount == 0) continue;
+
+            vault.redeem(msg.sender, positionId);
+
+            emit Redeemed(msg.sender, positionId, tbtcAmount, dmdAmounts[i]);
         }
     }
 
@@ -167,14 +181,13 @@ contract RedemptionEngine {
         returns (uint256)
     {
         (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
+            uint256 tbtcAmount,
             ,  // lockMonths (skip)
             ,  // unlockTime (skip)
             uint256 weight
         ) = vault.getPosition(user, positionId);
 
-        if (btcAmount == 0) return 0;
+        if (tbtcAmount == 0) return 0;
         return weight;
     }
 
@@ -190,14 +203,13 @@ contract RedemptionEngine {
         if (redeemed[user][positionId]) return false;
 
         (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
+            uint256 tbtcAmount,
             ,  // lockMonths (skip)
             ,  // unlockTime (skip)
             uint256 weight
         ) = vault.getPosition(user, positionId);
 
-        if (btcAmount == 0) return false;
+        if (tbtcAmount == 0) return false;
         if (!vault.isUnlocked(user, positionId)) return false;
         if (dmdToken.balanceOf(user) < weight) return false;
 

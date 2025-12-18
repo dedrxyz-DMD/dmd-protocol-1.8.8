@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 /**
  * @title IBTCReserveVault
- * @notice Interface for BTCReserveVault contract
+ * @notice Interface for BTCReserveVault contract (tBTC only)
  * @dev Used by MintDistributor and RedemptionEngine
  */
 interface IBTCReserveVault {
@@ -16,9 +16,6 @@ interface IBTCReserveVault {
     /// @notice Get vested weight for a user (flash loan protected)
     function getVestedWeight(address user) external view returns (uint256);
 
-    /// @notice Get total vested system weight
-    function getTotalVestedSystemWeight() external view returns (uint256);
-
     /// @notice Redeem position (RedemptionEngine only)
     function redeem(address user, uint256 positionId) external;
 
@@ -27,7 +24,6 @@ interface IBTCReserveVault {
         external
         view
         returns (
-            address btcAsset,
             uint256 amount,
             uint256 lockMonths,
             uint256 unlockTime,
@@ -39,4 +35,7 @@ interface IBTCReserveVault {
 
     /// @notice Check if position weight is fully vested
     function isWeightFullyVested(address user, uint256 positionId) external view returns (bool);
+
+    /// @notice Get total locked tBTC
+    function getTotalLocked() external view returns (uint256);
 }
