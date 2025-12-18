@@ -19,6 +19,27 @@ contract DeployMainnet is Script {
     // Base Mainnet tBTC (Threshold Network)
     address constant TBTC = 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b;
 
+    /*//////////////////////////////////////////////////////////////
+                        TEAM ALLOCATION CONFIG
+    //////////////////////////////////////////////////////////////*/
+
+    // Total team allocation: 3,600,000 DMD (20% of 18M max supply)
+    // Configure your team wallet addresses and their allocations below:
+    //
+    // Example distribution:
+    // - Founder:     1,800,000 DMD (50% of team)
+    // - Co-founder:    900,000 DMD (25% of team)
+    // - Advisors:      540,000 DMD (15% of team)
+    // - Treasury:      360,000 DMD (10% of team)
+    //
+    // Vesting schedule for ALL beneficiaries:
+    // - TGE (Day 0):  5% unlocked immediately
+    // - Linear:       95% over 7 years
+
+    /*//////////////////////////////////////////////////////////////
+                              CONTRACTS
+    //////////////////////////////////////////////////////////////*/
+
     BTCReserveVault public vault;
     EmissionScheduler public scheduler;
     MintDistributor public distributor;
@@ -29,6 +50,42 @@ contract DeployMainnet is Script {
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(pk);
+
+        // ============================================================
+        // CONFIGURE TEAM WALLETS HERE
+        // ============================================================
+        // Replace these addresses with your actual team wallet addresses
+        // Allocations must sum to 3,600,000e18 (3.6M DMD)
+
+        address[] memory beneficiaries = new address[](4);
+        uint256[] memory allocations = new uint256[](4);
+
+        // Wallet 1: Founder (50%)
+        beneficiaries[0] = 0x0000000000000000000000000000000000000001; // REPLACE
+        allocations[0] = 1_800_000e18; // 1.8M DMD
+
+        // Wallet 2: Co-founder (25%)
+        beneficiaries[1] = 0x0000000000000000000000000000000000000002; // REPLACE
+        allocations[1] = 900_000e18; // 900K DMD
+
+        // Wallet 3: Advisors (15%)
+        beneficiaries[2] = 0x0000000000000000000000000000000000000003; // REPLACE
+        allocations[2] = 540_000e18; // 540K DMD
+
+        // Wallet 4: Treasury (10%)
+        beneficiaries[3] = 0x0000000000000000000000000000000000000004; // REPLACE
+        allocations[3] = 360_000e18; // 360K DMD
+
+        // ============================================================
+        // END CONFIGURATION
+        // ============================================================
+
+        // Validate total allocation
+        uint256 totalAlloc = 0;
+        for (uint256 i = 0; i < allocations.length; i++) {
+            totalAlloc += allocations[i];
+        }
+        require(totalAlloc == 3_600_000e18, "Total allocation must be 3.6M DMD");
 
         console.log("==============================================");
         console.log("DMD Protocol v1.8.8 - Base Mainnet Deployment");
@@ -89,11 +146,6 @@ contract DeployMainnet is Script {
         console.log("5. RedemptionEngine:", address(redemption));
 
         // 6. Deploy VestingContract (team allocation: 3.6M DMD = 20% of max)
-        address[] memory beneficiaries = new address[](1);
-        uint256[] memory allocations = new uint256[](1);
-        beneficiaries[0] = deployer;
-        allocations[0] = 3_600_000e18; // 3.6M DMD
-
         vesting = new VestingContract(IDMDToken(address(dmdToken)), beneficiaries, allocations);
         require(address(vesting) == pVesting, "Vesting address mismatch");
         console.log("6. VestingContract:", address(vesting));
@@ -123,6 +175,14 @@ contract DeployMainnet is Script {
         console.log("Team Allocation:    3,600,000 DMD (20%)");
         console.log("Year 1 Emission:    3,600,000 DMD");
         console.log("Annual Decay:       25%");
+        console.log("");
+        console.log("Team Vesting Beneficiaries:");
+        console.log("---------------------------");
+        for (uint256 i = 0; i < beneficiaries.length; i++) {
+            console.log("Wallet", i + 1, ":", beneficiaries[i]);
+            console.log("  Allocation:", allocations[i] / 1e18, "DMD");
+            console.log("  TGE (5%):", (allocations[i] * 5) / 100 / 1e18, "DMD");
+        }
         console.log("");
         console.log("Verify contracts on BaseScan:");
         console.log("------------------------------");
