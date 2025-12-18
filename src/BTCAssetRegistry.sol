@@ -1,181 +1,151 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
 /**
  * @title BTCAssetRegistry
- * @notice Registry for approved BTC assets (WBTC, cbBTC, tBTC, native BTC, etc.)
- * @dev Allows protocol to support multiple BTC types without redeployment
+ * @notice Immutable registry for approved BTC assets (WBTC, cbBTC, tBTC, etc.)
+ * @dev Fully decentralized - no owner, no admin, no governance
+ * @dev Assets are set at deployment and cannot be modified
  */
-contract BTCAssetRegistry is Ownable {
-    
+contract BTCAssetRegistry {
+
     struct BTCAsset {
-        address tokenAddress;  // ERC20 address (address(0) for native)
-        bool isActive;         // Can be locked in protocol
+        address tokenAddress;  // ERC20 address
+        bool isActive;         // Always true for registered assets
         bool isNative;         // false = ERC20, true = native BTC bridge
-        uint8 decimals;        // Should be 8 for BTC
+        uint8 decimals;        // Token decimals
         string name;           // Display name
-        uint256 addedAt;       // Timestamp when added
+        uint256 addedAt;       // Timestamp when added (deployment time)
     }
-    
+
     /// @notice Asset ID => BTCAsset details
     mapping(uint256 => BTCAsset) public btcAssets;
-    
+
     /// @notice Token address => Asset ID (for quick lookup)
     mapping(address => uint256) public addressToAssetId;
-    
-    /// @notice Next available asset ID
-    uint256 public nextAssetId = 1;
-    
+
+    /// @notice Total number of registered assets (immutable after deployment)
+    uint256 public immutable totalAssets;
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    
-    event BTCAssetAdded(
+
+    event BTCAssetRegistered(
         uint256 indexed assetId,
         address indexed token,
-        string name
+        string name,
+        uint8 decimals
     );
-    
-    event BTCAssetDeactivated(uint256 indexed assetId);
-    
-    event BTCAssetActivated(uint256 indexed assetId);
-    
+
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    
-    constructor() Ownable(msg.sender) {}
-    
-    /*//////////////////////////////////////////////////////////////
-                            ADMIN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-    
+
     /**
-     * @notice Add a new BTC asset type to the registry
-     * @param tokenAddress Address of the BTC token (address(0) for native bridge)
-     * @param isNative True if this is a native BTC bridge, false if ERC20
-     * @param name Display name for the asset
+     * @notice Deploy registry with initial set of BTC assets
+     * @param tokenAddresses Array of BTC token addresses
+     * @param names Array of display names
+     * @param decimalValues Array of decimal values for each token
+     * @param isNativeFlags Array of flags indicating if asset is native BTC bridge
+     * @dev All arrays must have same length. Assets cannot be modified after deployment.
      */
-    function addBTCAsset(
-        address tokenAddress,
-        bool isNative,
-        string calldata name
-    ) external onlyOwner {
-        require(addressToAssetId[tokenAddress] == 0, "Asset already added");
-        
-        uint256 assetId = nextAssetId++;
-        
-        btcAssets[assetId] = BTCAsset({
-            tokenAddress: tokenAddress,
-            isActive: true,
-            isNative: isNative,
-            decimals: 8,
-            name: name,
-            addedAt: block.timestamp
-        });
-        
-        addressToAssetId[tokenAddress] = assetId;
-        
-        emit BTCAssetAdded(assetId, tokenAddress, name);
+    constructor(
+        address[] memory tokenAddresses,
+        string[] memory names,
+        uint8[] memory decimalValues,
+        bool[] memory isNativeFlags
+    ) {
+        require(tokenAddresses.length > 0, "No assets provided");
+        require(
+            tokenAddresses.length == names.length &&
+            tokenAddresses.length == decimalValues.length &&
+            tokenAddresses.length == isNativeFlags.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            require(tokenAddresses[i] != address(0), "Invalid token address");
+            require(addressToAssetId[tokenAddresses[i]] == 0, "Duplicate asset");
+
+            uint256 assetId = i + 1; // Asset IDs start at 1
+
+            btcAssets[assetId] = BTCAsset({
+                tokenAddress: tokenAddresses[i],
+                isActive: true,
+                isNative: isNativeFlags[i],
+                decimals: decimalValues[i],
+                name: names[i],
+                addedAt: block.timestamp
+            });
+
+            addressToAssetId[tokenAddresses[i]] = assetId;
+
+            emit BTCAssetRegistered(assetId, tokenAddresses[i], names[i], decimalValues[i]);
+        }
+
+        totalAssets = tokenAddresses.length;
     }
-    
-    /**
-     * @notice Deactivate a BTC asset (emergency use)
-     * @param assetId The asset ID to deactivate
-     * @dev Existing positions are not affected, but new locks are blocked
-     */
-    function deactivateAsset(uint256 assetId) external onlyOwner {
-        require(btcAssets[assetId].tokenAddress != address(0), "Asset not found");
-        btcAssets[assetId].isActive = false;
-        emit BTCAssetDeactivated(assetId);
-    }
-    
-    /**
-     * @notice Reactivate a previously deactivated asset
-     * @param assetId The asset ID to reactivate
-     */
-    function activateAsset(uint256 assetId) external onlyOwner {
-        require(btcAssets[assetId].tokenAddress != address(0), "Asset not found");
-        btcAssets[assetId].isActive = true;
-        emit BTCAssetActivated(assetId);
-    }
-    
+
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    
+
     /**
-     * @notice Check if a token address is an approved and active BTC asset
+     * @notice Check if a token address is an approved BTC asset
      * @param token The token address to check
-     * @return True if the token is approved and active
+     * @return True if the token is registered (always active)
      */
     function isApprovedBTC(address token) external view returns (bool) {
-        uint256 assetId = addressToAssetId[token];
-        if (assetId == 0) return false;
-        return btcAssets[assetId].isActive;
+        return addressToAssetId[token] != 0;
     }
-    
+
     /**
-     * @notice Get all active BTC assets
-     * @return Array of all active BTCAsset structs
+     * @notice Get all registered BTC assets
+     * @return Array of all BTCAsset structs
      */
     function getActiveBTCAssets() external view returns (BTCAsset[] memory) {
-        // Count active assets
-        uint256 activeCount = 0;
-        for (uint256 i = 1; i < nextAssetId; i++) {
-            if (btcAssets[i].isActive) {
-                activeCount++;
-            }
+        BTCAsset[] memory assets = new BTCAsset[](totalAssets);
+
+        for (uint256 i = 0; i < totalAssets; i++) {
+            assets[i] = btcAssets[i + 1];
         }
-        
-        // Build array of active assets
-        BTCAsset[] memory active = new BTCAsset[](activeCount);
-        uint256 index = 0;
-        
-        for (uint256 i = 1; i < nextAssetId; i++) {
-            if (btcAssets[i].isActive) {
-                active[index] = btcAssets[i];
-                index++;
-            }
-        }
-        
-        return active;
+
+        return assets;
     }
-    
+
     /**
      * @notice Get asset details by ID
      * @param assetId The asset ID to query
      * @return Asset details
      */
-    function getAssetById(uint256 assetId) 
-        external 
-        view 
-        returns (BTCAsset memory) 
+    function getAssetById(uint256 assetId)
+        external
+        view
+        returns (BTCAsset memory)
     {
-        require(btcAssets[assetId].tokenAddress != address(0), "Asset not found");
+        require(assetId > 0 && assetId <= totalAssets, "Asset not found");
         return btcAssets[assetId];
     }
-    
+
     /**
      * @notice Get asset ID by token address
      * @param token The token address to query
      * @return The asset ID (0 if not found)
      */
-    function getAssetIdByAddress(address token) 
-        external 
-        view 
-        returns (uint256) 
+    function getAssetIdByAddress(address token)
+        external
+        view
+        returns (uint256)
     {
         return addressToAssetId[token];
     }
-    
+
     /**
-     * @notice Get total number of assets (active + inactive)
+     * @notice Get total number of registered assets
      * @return Total count of assets
      */
     function getTotalAssetCount() external view returns (uint256) {
-        return nextAssetId - 1;
+        return totalAssets;
     }
 }

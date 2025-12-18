@@ -4,15 +4,15 @@ pragma solidity 0.8.20;
 /**
  * @title EmissionScheduler
  * @notice Manages year-based DMD emissions with 0.75 annual decay
+ * @dev Fully decentralized - no owner, no admin, no governance
  * @dev Linear release per second, 14.4M cumulative cap, immutable schedule
+ * @dev Emissions start automatically at deployment
  */
 contract EmissionScheduler {
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error NotStarted();
-    error AlreadyStarted();
     error Unauthorized();
     error EmissionCapReached();
 
@@ -30,10 +30,13 @@ contract EmissionScheduler {
                                STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    address public immutable owner;
+    /// @notice Address authorized to claim emissions (MintDistributor)
     address public immutable mintDistributor;
 
-    uint256 public emissionStartTime;
+    /// @notice Timestamp when emissions started (set at deployment)
+    uint256 public immutable emissionStartTime;
+
+    /// @notice Total amount of DMD emitted so far
     uint256 public totalEmitted;
 
     /*//////////////////////////////////////////////////////////////
@@ -47,26 +50,18 @@ contract EmissionScheduler {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _owner, address _mintDistributor) {
-        if (_owner == address(0) || _mintDistributor == address(0)) {
+    /**
+     * @notice Deploy and automatically start emission schedule
+     * @param _mintDistributor Address of the MintDistributor contract
+     * @dev Emissions begin immediately at deployment - no owner needed
+     */
+    constructor(address _mintDistributor) {
+        if (_mintDistributor == address(0)) {
             revert Unauthorized();
         }
-        owner = _owner;
         mintDistributor = _mintDistributor;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Start emission schedule (one-time only)
-     */
-    function startEmissions() external {
-        if (msg.sender != owner) revert Unauthorized();
-        if (emissionStartTime != 0) revert AlreadyStarted();
-
         emissionStartTime = block.timestamp;
+
         emit EmissionStarted(block.timestamp);
     }
 
@@ -75,18 +70,17 @@ contract EmissionScheduler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Claim available emissions (called by MintDistributor)
+     * @notice Claim available emissions (called by MintDistributor only)
      * @return amount Claimable emission amount
      */
     function claimEmission() external returns (uint256 amount) {
         if (msg.sender != mintDistributor) revert Unauthorized();
-        if (emissionStartTime == 0) revert NotStarted();
 
         amount = _claimableNow();
         if (amount == 0) return 0;
 
         totalEmitted += amount;
-        
+
         uint256 currentYear = _getCurrentYear();
         emit EmissionClaimed(amount, currentYear);
     }
@@ -99,7 +93,6 @@ contract EmissionScheduler {
      * @notice Get currently claimable emission amount
      */
     function claimableNow() external view returns (uint256) {
-        if (emissionStartTime == 0) return 0;
         return _claimableNow();
     }
 
@@ -107,16 +100,17 @@ contract EmissionScheduler {
      * @notice Get current emission year (0-indexed)
      */
     function getCurrentYear() external view returns (uint256) {
-        if (emissionStartTime == 0) return 0;
         return _getCurrentYear();
     }
 
     /**
      * @notice Get total emission for a specific year
+     * @param year The year index (0 = first year)
+     * @return The emission amount for that year
      */
     function getYearEmission(uint256 year) public pure returns (uint256) {
         if (year == 0) return YEAR_1_EMISSION;
-        
+
         uint256 emission = YEAR_1_EMISSION;
         for (uint256 i = 0; i < year; i++) {
             emission = (emission * DECAY_NUMERATOR) / DECAY_DENOMINATOR;
@@ -128,8 +122,6 @@ contract EmissionScheduler {
      * @notice Get emission rate per second for current year
      */
     function currentEmissionRate() external view returns (uint256) {
-        if (emissionStartTime == 0) return 0;
-        
         uint256 year = _getCurrentYear();
         uint256 yearEmission = getYearEmission(year);
         return yearEmission / SECONDS_PER_YEAR;
@@ -146,7 +138,6 @@ contract EmissionScheduler {
      * @notice Get total theoretical emissions up to current time
      */
     function totalTheoreticalEmissions() external view returns (uint256) {
-        if (emissionStartTime == 0) return 0;
         return _calculateTotalEmittedUpToNow();
     }
 
@@ -158,8 +149,8 @@ contract EmissionScheduler {
         if (capReached()) return 0;
 
         uint256 theoretical = _calculateTotalEmittedUpToNow();
-        uint256 claimable = theoretical > totalEmitted 
-            ? theoretical - totalEmitted 
+        uint256 claimable = theoretical > totalEmitted
+            ? theoretical - totalEmitted
             : 0;
 
         // Enforce cap
@@ -186,7 +177,7 @@ contract EmissionScheduler {
         while (remainingTime >= SECONDS_PER_YEAR) {
             uint256 yearEmission = getYearEmission(currentYear);
             totalEmission += yearEmission;
-            
+
             remainingTime -= SECONDS_PER_YEAR;
             currentYear++;
 
