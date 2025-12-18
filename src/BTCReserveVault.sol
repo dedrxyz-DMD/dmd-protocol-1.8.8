@@ -30,8 +30,9 @@ contract BTCReserveVault {
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice tBTC token address on Base mainnet (immutable, only accepted asset)
-    address public constant TBTC = 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b;
+    /// @notice tBTC token address (immutable, set at deployment)
+    /// @dev Mainnet Base: 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b
+    address public immutable TBTC;
 
     uint256 public constant MAX_WEIGHT_MONTHS = 24;
     uint256 public constant WEIGHT_PER_MONTH = 20; // 0.02 in basis points (20/1000)
@@ -93,10 +94,17 @@ contract BTCReserveVault {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _redemptionEngine) {
-        if (_redemptionEngine == address(0)) {
+    /**
+     * @notice Deploy the vault with tBTC address and redemption engine
+     * @param _tbtc tBTC token address (immutable after deployment)
+     * @param _redemptionEngine RedemptionEngine contract address
+     * @dev For Base mainnet, use: 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b
+     */
+    constructor(address _tbtc, address _redemptionEngine) {
+        if (_tbtc == address(0) || _redemptionEngine == address(0)) {
             revert InvalidAmount();
         }
+        TBTC = _tbtc;
         redemptionEngine = _redemptionEngine;
     }
 

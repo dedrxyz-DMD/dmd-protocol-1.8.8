@@ -38,4 +38,7 @@ interface IBTCReserveVault {
 
     /// @notice Get total locked tBTC
     function getTotalLocked() external view returns (uint256);
+
+    /// @notice Get tBTC token address
+    function TBTC() external view returns (address);
 }
