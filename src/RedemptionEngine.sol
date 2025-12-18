@@ -103,6 +103,7 @@ contract RedemptionEngine {
      * @notice Batch redeem multiple positions
      * @param positionIds Array of position identifiers
      * @param dmdAmounts Array of DMD amounts to burn per position
+     * @dev DMD is transferred and burned BEFORE vault redemptions for safety
      */
     function redeemMultiple(
         uint256[] calldata positionIds,
@@ -111,6 +112,11 @@ contract RedemptionEngine {
         if (positionIds.length != dmdAmounts.length) revert InvalidAmount();
 
         uint256 totalBurn = 0;
+        uint256 validCount = 0;
+
+        // First pass: validate and calculate total required DMD
+        // Store valid indices to avoid re-validation
+        bool[] memory valid = new bool[](positionIds.length);
 
         for (uint256 i = 0; i < positionIds.length; i++) {
             uint256 positionId = positionIds[i];
@@ -131,18 +137,41 @@ contract RedemptionEngine {
             if (!vault.isUnlocked(msg.sender, positionId)) continue;
             if (dmdAmount < weight) continue;
 
-            redeemed[msg.sender][positionId] = true;
+            valid[i] = true;
             totalBurn += dmdAmount;
+            validCount++;
+        }
 
+        // If nothing to redeem, return early
+        if (totalBurn == 0) return;
+
+        // Transfer and burn DMD FIRST (before any state changes)
+        totalBurnedByUser[msg.sender] += totalBurn;
+        dmdToken.transferFrom(msg.sender, address(this), totalBurn);
+        dmdToken.burn(totalBurn);
+
+        // Second pass: execute redemptions (state already verified)
+        for (uint256 i = 0; i < positionIds.length; i++) {
+            if (!valid[i]) continue;
+
+            uint256 positionId = positionIds[i];
+            uint256 dmdAmount = dmdAmounts[i];
+
+            // Mark as redeemed
+            redeemed[msg.sender][positionId] = true;
+
+            // Get btcAmount for event
+            (
+                ,
+                uint256 btcAmount,
+                ,
+                ,
+            ) = vault.getPosition(msg.sender, positionId);
+
+            // Release tBTC from vault
             vault.redeem(msg.sender, positionId);
 
             emit Redeemed(msg.sender, positionId, btcAmount, dmdAmount);
-        }
-
-        if (totalBurn > 0) {
-            totalBurnedByUser[msg.sender] += totalBurn;
-            dmdToken.transferFrom(msg.sender, address(this), totalBurn);
-            dmdToken.burn(totalBurn);
         }
     }
 

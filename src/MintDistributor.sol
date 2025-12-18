@@ -148,17 +148,20 @@ contract MintDistributor {
     /**
      * @notice Claim DMD allocation for a finalized epoch
      * @param epochId Epoch to claim from
+     * @dev Uses VESTED weight for flash loan protection
      */
     function claim(uint256 epochId) external {
         EpochData memory epoch = epochs[epochId];
-        
+
         if (!epoch.finalized) revert EpochNotFinalized();
         if (claimed[epochId][msg.sender]) revert AlreadyClaimed();
+        if (epoch.snapshotWeight == 0) revert NoWeight(); // Prevent division by zero
 
-        uint256 userWeight = vault.totalWeightOf(msg.sender);
+        // Use VESTED weight - critical for flash loan protection
+        uint256 userWeight = vault.getVestedWeight(msg.sender);
         if (userWeight == 0) revert NoWeight();
 
-        // Calculate proportional share
+        // Calculate proportional share based on vested weight
         uint256 userShare = (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
 
         claimed[epochId][msg.sender] = true;
@@ -171,20 +174,23 @@ contract MintDistributor {
 
     /**
      * @notice Batch claim multiple epochs
+     * @dev Uses VESTED weight for flash loan protection
      */
     function claimMultiple(uint256[] calldata epochIds) external {
         for (uint256 i = 0; i < epochIds.length; i++) {
             uint256 epochId = epochIds[i];
-            
+
             EpochData memory epoch = epochs[epochId];
             if (!epoch.finalized) continue;
             if (claimed[epochId][msg.sender]) continue;
+            if (epoch.snapshotWeight == 0) continue; // Prevent division by zero
 
-            uint256 userWeight = vault.totalWeightOf(msg.sender);
+            // Use VESTED weight - critical for flash loan protection
+            uint256 userWeight = vault.getVestedWeight(msg.sender);
             if (userWeight == 0) continue;
 
             uint256 userShare = (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
-            
+
             claimed[epochId][msg.sender] = true;
             dmdToken.mint(msg.sender, userShare);
 
@@ -206,19 +212,21 @@ contract MintDistributor {
 
     /**
      * @notice Calculate claimable amount for user in specific epoch
+     * @dev Uses VESTED weight for accurate calculation
      */
-    function getClaimableAmount(address user, uint256 epochId) 
-        external 
-        view 
-        returns (uint256) 
+    function getClaimableAmount(address user, uint256 epochId)
+        external
+        view
+        returns (uint256)
     {
         EpochData memory epoch = epochs[epochId];
-        
+
         if (!epoch.finalized) return 0;
         if (claimed[epochId][user]) return 0;
         if (epoch.snapshotWeight == 0) return 0;
 
-        uint256 userWeight = vault.totalWeightOf(user);
+        // Use VESTED weight - critical for flash loan protection
+        uint256 userWeight = vault.getVestedWeight(user);
         if (userWeight == 0) return 0;
 
         return (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
@@ -249,21 +257,23 @@ contract MintDistributor {
 
     /**
      * @notice Calculate total claimable across multiple epochs
+     * @dev Uses VESTED weight for accurate calculation
      */
-    function getTotalClaimable(address user, uint256[] calldata epochIds) 
-        external 
-        view 
-        returns (uint256 total) 
+    function getTotalClaimable(address user, uint256[] calldata epochIds)
+        external
+        view
+        returns (uint256 total)
     {
         for (uint256 i = 0; i < epochIds.length; i++) {
             uint256 epochId = epochIds[i];
             EpochData memory epoch = epochs[epochId];
-            
+
             if (!epoch.finalized || claimed[epochId][user] || epoch.snapshotWeight == 0) {
                 continue;
             }
 
-            uint256 userWeight = vault.totalWeightOf(user);
+            // Use VESTED weight - critical for flash loan protection
+            uint256 userWeight = vault.getVestedWeight(user);
             if (userWeight == 0) continue;
 
             total += (epoch.totalEmission * userWeight) / epoch.snapshotWeight;
