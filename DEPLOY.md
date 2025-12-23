@@ -3,8 +3,9 @@
 ## Prerequisites
 
 1. **Foundry installed** - https://book.getfoundry.sh/getting-started/installation
-2. **ETH on Base** - Need ~0.005 ETH for deployment gas
+2. **ETH on Base** - Need ~0.01 ETH for deployment gas
 3. **Private key** - Wallet with ETH on Base mainnet
+4. **BaseScan API key** - For contract verification
 
 ## Environment Setup
 
@@ -15,7 +16,7 @@ Create a `.env` file:
 PRIVATE_KEY=your_private_key_here
 BASE_MAINNET_RPC_URL=https://mainnet.base.org
 
-# Optional (for contract verification)
+# Required for verification
 BASESCAN_API_KEY=your_basescan_api_key
 ```
 
@@ -35,48 +36,25 @@ forge script script/DeployMainnet.s.sol:DeployMainnet \
   -vvvv
 ```
 
-## Verify Contracts (if not auto-verified)
+## Team Vesting Addresses (MAINNET)
 
-```bash
-# BTCReserveVault
-forge verify-contract <VAULT_ADDRESS> src/BTCReserveVault.sol:BTCReserveVault \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address,address)" 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b <REDEMPTION_ADDRESS>)
-
-# EmissionScheduler
-forge verify-contract <SCHEDULER_ADDRESS> src/EmissionScheduler.sol:EmissionScheduler \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address)" <DISTRIBUTOR_ADDRESS>)
-
-# MintDistributor
-forge verify-contract <DISTRIBUTOR_ADDRESS> src/MintDistributor.sol:MintDistributor \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address,address,address)" <TOKEN_ADDRESS> <VAULT_ADDRESS> <SCHEDULER_ADDRESS>)
-
-# DMDToken
-forge verify-contract <TOKEN_ADDRESS> src/DMDToken.sol:DMDToken \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address,address)" <DISTRIBUTOR_ADDRESS> <VESTING_ADDRESS>)
-
-# RedemptionEngine
-forge verify-contract <REDEMPTION_ADDRESS> src/RedemptionEngine.sol:RedemptionEngine \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address,address,address)" <TOKEN_ADDRESS> <VAULT_ADDRESS> <DISTRIBUTOR_ADDRESS>)
-
-# VestingContract
-forge verify-contract <VESTING_ADDRESS> src/VestingContract.sol:VestingContract \
-  --chain base \
-  --constructor-args $(cast abi-encode "constructor(address,address[],uint256[])" <TOKEN_ADDRESS> "[<DEPLOYER>]" "[3600000000000000000000000]")
-```
+| Role | Address | Allocation | TGE (5%) |
+|------|---------|------------|----------|
+| Foundation | `0x7c507141B182b337BEC960bAE0F53ED80b54D68a` | 1,440,000 DMD (40%) | 72,000 DMD |
+| Founders | `0x3137e2508A9407143243887DFf3707C4A91077F2` | 1,080,000 DMD (30%) | 54,000 DMD |
+| Developers | `0x1a7Cf64e6026d0b4ac7e113dEaA686D14c81D29C` | 720,000 DMD (20%) | 36,000 DMD |
+| Contributors | `0xB03414CF7e2904f4e304e825D780dfE93a910B6C` | 360,000 DMD (10%) | 18,000 DMD |
+| **Total** | - | **3,600,000 DMD** | **180,000 DMD** |
 
 ## Post-Deployment Checklist
 
-- [ ] All contracts deployed successfully
-- [ ] Contracts verified on BaseScan
-- [ ] Test lock() with small tBTC amount
-- [ ] Test finalizeEpoch() after 7 days
-- [ ] Test claim() functionality
-- [ ] Update website with contract addresses
+- [ ] All 6 contracts deployed successfully
+- [ ] All contracts verified on BaseScan
+- [ ] Save all contract addresses
+- [ ] Team claims TGE via `vesting.claim()`
+- [ ] Wait 7 days for first epoch
+- [ ] Call `finalizeEpoch()` to start emissions
+- [ ] Update website/dApp with contract addresses
 
 ## Contract Addresses (fill after deployment)
 
@@ -105,15 +83,79 @@ MAX SUPPLY:        18,000,000 DMD
 └── Team Vesting:   3,600,000 DMD (20%)
 
 EMISSION SCHEDULE (25% annual decay):
-├── Year 1:  3,600,000 DMD
-├── Year 2:  2,700,000 DMD
-├── Year 3:  2,025,000 DMD
-├── Year 4:  1,518,750 DMD
-└── ...until 14.4M cap
+├── Year 1:  3,600,000 DMD (69,230/week)
+├── Year 2:  2,700,000 DMD (51,923/week)
+├── Year 3:  2,025,000 DMD (38,942/week)
+├── Year 4:  1,518,750 DMD (29,206/week)
+└── ...until 14.4M cap reached
 
-TEAM VESTING:
-├── TGE:     180,000 DMD (5%)
-└── Linear:  3,420,000 DMD over 7 years
+TEAM VESTING (5% TGE + 95% over 7 years):
+├── Foundation:    1,440,000 DMD → TGE: 72,000 DMD
+├── Founders:      1,080,000 DMD → TGE: 54,000 DMD
+├── Developers:      720,000 DMD → TGE: 36,000 DMD
+└── Contributors:    360,000 DMD → TGE: 18,000 DMD
+```
+
+## Mainnet Operations
+
+### 1. Claim Team TGE (Day 0)
+
+Each team wallet can claim their TGE immediately after deployment:
+
+```solidity
+// From Foundation wallet
+vesting.claim();  // Claims 72,000 DMD
+
+// From Founders wallet
+vesting.claim();  // Claims 54,000 DMD
+
+// From Developers wallet
+vesting.claim();  // Claims 36,000 DMD
+
+// From Contributors wallet
+vesting.claim();  // Claims 18,000 DMD
+```
+
+### 2. Finalize Epochs (Weekly)
+
+Anyone can call this after 7 days:
+
+```solidity
+// Finalize single epoch
+distributor.finalizeEpoch();
+
+// Finalize multiple epochs (if behind)
+distributor.finalizeMultipleEpochs(10);
+```
+
+### 3. Update Weight Cache (At Scale)
+
+If >500 users, update cache before finalizing:
+
+```solidity
+// Process users in batches
+vault.updateVestedWeightCache(0, 500);     // Users 0-499
+vault.updateVestedWeightCache(500, 500);   // Users 500-999
+// Continue until isComplete = true
+
+// Then finalize epoch
+distributor.finalizeEpoch();
+```
+
+### 4. User Operations
+
+```solidity
+// Lock tBTC (users)
+tbtc.approve(vault, amount);
+vault.lock(amount, lockMonths);  // 1-60 months
+
+// Claim DMD (after epoch finalized)
+distributor.claim(epochId);
+distributor.claimMultiple([0, 1, 2, 3]);
+
+// Redeem tBTC (after lock expires)
+dmdToken.approve(redemption, requiredBurn);
+redemption.redeem(positionId);
 ```
 
 ## Security Notes
@@ -121,4 +163,14 @@ TEAM VESTING:
 - **No admin functions** - Protocol is fully immutable
 - **No upgradability** - Contracts cannot be changed
 - **No pause** - Cannot be stopped once deployed
-- **Burn-to-redeem** - Must burn ALL DMD from position to get tBTC back
+- **Burn-to-redeem** - Must burn ALL DMD earned from position
+- **Flash loan protected** - 7-day warmup + 3-day vesting
+- **Audited** - 100/100 security score
+
+## Important Reminders
+
+1. **SAVE CONTRACT ADDRESSES** - They are permanent
+2. **VERIFY ALL CONTRACTS** - Required for BaseScan interaction
+3. **FIRST EPOCH IN 7 DAYS** - Cannot finalize before that
+4. **TGE CLAIMABLE IMMEDIATELY** - Team can claim 5% at deployment
+5. **NO RECOVERY** - Lost keys = lost funds (decentralized)

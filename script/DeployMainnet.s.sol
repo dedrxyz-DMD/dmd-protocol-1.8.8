@@ -24,17 +24,22 @@ contract DeployMainnet is Script {
     //////////////////////////////////////////////////////////////*/
 
     // Total team allocation: 3,600,000 DMD (20% of 18M max supply)
-    // Configure your team wallet addresses and their allocations below:
     //
-    // Example distribution:
-    // - Founder:     1,800,000 DMD (50% of team)
-    // - Co-founder:    900,000 DMD (25% of team)
-    // - Advisors:      540,000 DMD (15% of team)
-    // - Treasury:      360,000 DMD (10% of team)
+    // Distribution:
+    // - Foundation:    1,440,000 DMD (40% of team allocation)
+    // - Founders:      1,080,000 DMD (30% of team allocation)
+    // - Developers:      720,000 DMD (20% of team allocation)
+    // - Contributors:    360,000 DMD (10% of team allocation)
     //
     // Vesting schedule for ALL beneficiaries:
     // - TGE (Day 0):  5% unlocked immediately
     // - Linear:       95% over 7 years
+
+    // Team wallet addresses (MAINNET - DO NOT CHANGE)
+    address constant FOUNDATION   = 0x7c507141B182b337BEC960bAE0F53ED80b54D68a;
+    address constant FOUNDERS     = 0x3137e2508A9407143243887DFf3707C4A91077F2;
+    address constant DEVELOPERS   = 0x1a7Cf64e6026d0b4ac7e113dEaA686D14c81D29C;
+    address constant CONTRIBUTORS = 0xB03414CF7e2904f4e304e825D780dfE93a910B6C;
 
     /*//////////////////////////////////////////////////////////////
                               CONTRACTS
@@ -52,32 +57,30 @@ contract DeployMainnet is Script {
         address deployer = vm.addr(pk);
 
         // ============================================================
-        // CONFIGURE TEAM WALLETS HERE
+        // TEAM WALLET CONFIGURATION (MAINNET)
         // ============================================================
-        // Replace these addresses with your actual team wallet addresses
-        // Allocations must sum to 3,600,000e18 (3.6M DMD)
 
         address[] memory beneficiaries = new address[](4);
         uint256[] memory allocations = new uint256[](4);
 
-        // Wallet 1: Founder (50%)
-        beneficiaries[0] = 0x0000000000000000000000000000000000000001; // REPLACE
-        allocations[0] = 1_800_000e18; // 1.8M DMD
+        // Foundation (40% of team = 1,440,000 DMD)
+        beneficiaries[0] = FOUNDATION;
+        allocations[0] = 1_440_000e18;
 
-        // Wallet 2: Co-founder (25%)
-        beneficiaries[1] = 0x0000000000000000000000000000000000000002; // REPLACE
-        allocations[1] = 900_000e18; // 900K DMD
+        // Founders (30% of team = 1,080,000 DMD)
+        beneficiaries[1] = FOUNDERS;
+        allocations[1] = 1_080_000e18;
 
-        // Wallet 3: Advisors (15%)
-        beneficiaries[2] = 0x0000000000000000000000000000000000000003; // REPLACE
-        allocations[2] = 540_000e18; // 540K DMD
+        // Developers (20% of team = 720,000 DMD)
+        beneficiaries[2] = DEVELOPERS;
+        allocations[2] = 720_000e18;
 
-        // Wallet 4: Treasury (10%)
-        beneficiaries[3] = 0x0000000000000000000000000000000000000004; // REPLACE
-        allocations[3] = 360_000e18; // 360K DMD
+        // Contributors (10% of team = 360,000 DMD)
+        beneficiaries[3] = CONTRIBUTORS;
+        allocations[3] = 360_000e18;
 
         // ============================================================
-        // END CONFIGURATION
+        // END CONFIGURATION - Total: 3,600,000 DMD
         // ============================================================
 
         // Validate total allocation
@@ -178,14 +181,30 @@ contract DeployMainnet is Script {
         console.log("");
         console.log("Team Vesting Beneficiaries:");
         console.log("---------------------------");
-        for (uint256 i = 0; i < beneficiaries.length; i++) {
-            console.log("Wallet", i + 1, ":", beneficiaries[i]);
-            console.log("  Allocation:", allocations[i] / 1e18, "DMD");
-            console.log("  TGE (5%):", (allocations[i] * 5) / 100 / 1e18, "DMD");
-        }
+        console.log("1. Foundation:   ", FOUNDATION);
+        console.log("   Allocation:    1,440,000 DMD (40%)");
+        console.log("   TGE (5%):      72,000 DMD");
         console.log("");
-        console.log("Verify contracts on BaseScan:");
-        console.log("------------------------------");
-        console.log("forge verify-contract", address(vault), "src/BTCReserveVault.sol:BTCReserveVault --chain base");
+        console.log("2. Founders:     ", FOUNDERS);
+        console.log("   Allocation:    1,080,000 DMD (30%)");
+        console.log("   TGE (5%):      54,000 DMD");
+        console.log("");
+        console.log("3. Developers:   ", DEVELOPERS);
+        console.log("   Allocation:    720,000 DMD (20%)");
+        console.log("   TGE (5%):      36,000 DMD");
+        console.log("");
+        console.log("4. Contributors: ", CONTRIBUTORS);
+        console.log("   Allocation:    360,000 DMD (10%)");
+        console.log("   TGE (5%):      18,000 DMD");
+        console.log("");
+        console.log("==============================================");
+        console.log("NEXT STEPS:");
+        console.log("==============================================");
+        console.log("1. Verify all contracts on BaseScan");
+        console.log("2. Wait 7 days for first epoch");
+        console.log("3. Call finalizeEpoch() to start emissions");
+        console.log("4. Team can claim TGE immediately via vesting.claim()");
+        console.log("");
+        console.log("IMPORTANT: Save these addresses!");
     }
 }
