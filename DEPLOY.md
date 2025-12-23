@@ -38,13 +38,13 @@ forge script script/DeployMainnet.s.sol:DeployMainnet \
 
 ## Team Vesting Addresses (MAINNET)
 
-| Role | Address | Allocation | TGE (5%) |
-|------|---------|------------|----------|
-| Foundation | `0x7c507141B182b337BEC960bAE0F53ED80b54D68a` | 1,440,000 DMD (40%) | 72,000 DMD |
-| Founders | `0x3137e2508A9407143243887DFf3707C4A91077F2` | 1,080,000 DMD (30%) | 54,000 DMD |
-| Developers | `0x1a7Cf64e6026d0b4ac7e113dEaA686D14c81D29C` | 720,000 DMD (20%) | 36,000 DMD |
-| Contributors | `0xB03414CF7e2904f4e304e825D780dfE93a910B6C` | 360,000 DMD (10%) | 18,000 DMD |
-| **Total** | - | **3,600,000 DMD** | **180,000 DMD** |
+| Role | Address | Allocation | % of Total | TGE (5%) |
+|------|---------|------------|------------|----------|
+| Foundation | `0x7c507141B182b337BEC960bAE0F53ED80b54D68a` | 1,800,000 DMD | 10% | 90,000 DMD |
+| Founders | `0x3137e2508A9407143243887DFf3707C4A91077F2` | 900,000 DMD | 5% | 45,000 DMD |
+| Developers | `0x1a7Cf64e6026d0b4ac7e113dEaA686D14c81D29C` | 450,000 DMD | 2.5% | 22,500 DMD |
+| Contributors | `0xB03414CF7e2904f4e304e825D780dfE93a910B6C` | 450,000 DMD | 2.5% | 22,500 DMD |
+| **Total** | - | **3,600,000 DMD** | **20%** | **180,000 DMD** |
 
 ## Post-Deployment Checklist
 
@@ -90,10 +90,10 @@ EMISSION SCHEDULE (25% annual decay):
 └── ...until 14.4M cap reached
 
 TEAM VESTING (5% TGE + 95% over 7 years):
-├── Foundation:    1,440,000 DMD → TGE: 72,000 DMD
-├── Founders:      1,080,000 DMD → TGE: 54,000 DMD
-├── Developers:      720,000 DMD → TGE: 36,000 DMD
-└── Contributors:    360,000 DMD → TGE: 18,000 DMD
+├── Foundation:    1,800,000 DMD (10% of total) → TGE: 90,000 DMD
+├── Founders:        900,000 DMD (5% of total)  → TGE: 45,000 DMD
+├── Developers:      450,000 DMD (2.5% of total) → TGE: 22,500 DMD
+└── Contributors:    450,000 DMD (2.5% of total) → TGE: 22,500 DMD
 ```
 
 ## Mainnet Operations
@@ -104,16 +104,16 @@ Each team wallet can claim their TGE immediately after deployment:
 
 ```solidity
 // From Foundation wallet
-vesting.claim();  // Claims 72,000 DMD
+vesting.claim();  // Claims 90,000 DMD
 
 // From Founders wallet
-vesting.claim();  // Claims 54,000 DMD
+vesting.claim();  // Claims 45,000 DMD
 
 // From Developers wallet
-vesting.claim();  // Claims 36,000 DMD
+vesting.claim();  // Claims 22,500 DMD
 
 // From Contributors wallet
-vesting.claim();  // Claims 18,000 DMD
+vesting.claim();  // Claims 22,500 DMD
 ```
 
 ### 2. Finalize Epochs (Weekly)

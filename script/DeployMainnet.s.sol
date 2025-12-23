@@ -26,10 +26,10 @@ contract DeployMainnet is Script {
     // Total team allocation: 3,600,000 DMD (20% of 18M max supply)
     //
     // Distribution:
-    // - Foundation:    1,440,000 DMD (40% of team allocation)
-    // - Founders:      1,080,000 DMD (30% of team allocation)
-    // - Developers:      720,000 DMD (20% of team allocation)
-    // - Contributors:    360,000 DMD (10% of team allocation)
+    // - Foundation:    1,800,000 DMD (50% of team = 10% of total)
+    // - Founders:        900,000 DMD (25% of team = 5% of total)
+    // - Developers:      450,000 DMD (12.5% of team = 2.5% of total)
+    // - Contributors:    450,000 DMD (12.5% of team = 2.5% of total)
     //
     // Vesting schedule for ALL beneficiaries:
     // - TGE (Day 0):  5% unlocked immediately
@@ -63,24 +63,24 @@ contract DeployMainnet is Script {
         address[] memory beneficiaries = new address[](4);
         uint256[] memory allocations = new uint256[](4);
 
-        // Foundation (40% of team = 1,440,000 DMD)
+        // Foundation (50% of team = 10% of total = 1,800,000 DMD)
         beneficiaries[0] = FOUNDATION;
-        allocations[0] = 1_440_000e18;
+        allocations[0] = 1_800_000e18;
 
-        // Founders (30% of team = 1,080,000 DMD)
+        // Founders (25% of team = 5% of total = 900,000 DMD)
         beneficiaries[1] = FOUNDERS;
-        allocations[1] = 1_080_000e18;
+        allocations[1] = 900_000e18;
 
-        // Developers (20% of team = 720,000 DMD)
+        // Developers (12.5% of team = 2.5% of total = 450,000 DMD)
         beneficiaries[2] = DEVELOPERS;
-        allocations[2] = 720_000e18;
+        allocations[2] = 450_000e18;
 
-        // Contributors (10% of team = 360,000 DMD)
+        // Contributors (12.5% of team = 2.5% of total = 450,000 DMD)
         beneficiaries[3] = CONTRIBUTORS;
-        allocations[3] = 360_000e18;
+        allocations[3] = 450_000e18;
 
         // ============================================================
-        // END CONFIGURATION - Total: 3,600,000 DMD
+        // END CONFIGURATION - Total: 3,600,000 DMD (20% of 18M)
         // ============================================================
 
         // Validate total allocation
@@ -182,20 +182,20 @@ contract DeployMainnet is Script {
         console.log("Team Vesting Beneficiaries:");
         console.log("---------------------------");
         console.log("1. Foundation:   ", FOUNDATION);
-        console.log("   Allocation:    1,440,000 DMD (40%)");
-        console.log("   TGE (5%):      72,000 DMD");
+        console.log("   Allocation:    1,800,000 DMD (50% of team = 10% of total)");
+        console.log("   TGE (5%):      90,000 DMD");
         console.log("");
         console.log("2. Founders:     ", FOUNDERS);
-        console.log("   Allocation:    1,080,000 DMD (30%)");
-        console.log("   TGE (5%):      54,000 DMD");
+        console.log("   Allocation:    900,000 DMD (25% of team = 5% of total)");
+        console.log("   TGE (5%):      45,000 DMD");
         console.log("");
         console.log("3. Developers:   ", DEVELOPERS);
-        console.log("   Allocation:    720,000 DMD (20%)");
-        console.log("   TGE (5%):      36,000 DMD");
+        console.log("   Allocation:    450,000 DMD (12.5% of team = 2.5% of total)");
+        console.log("   TGE (5%):      22,500 DMD");
         console.log("");
         console.log("4. Contributors: ", CONTRIBUTORS);
-        console.log("   Allocation:    360,000 DMD (10%)");
-        console.log("   TGE (5%):      18,000 DMD");
+        console.log("   Allocation:    450,000 DMD (12.5% of team = 2.5% of total)");
+        console.log("   TGE (5%):      22,500 DMD");
         console.log("");
         console.log("==============================================");
         console.log("NEXT STEPS:");
