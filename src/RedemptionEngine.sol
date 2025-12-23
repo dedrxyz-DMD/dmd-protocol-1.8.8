@@ -3,221 +3,138 @@ pragma solidity 0.8.20;
 
 import "./interfaces/IDMDToken.sol";
 import "./interfaces/IBTCReserveVault.sol";
+import "./interfaces/IMintDistributor.sol";
 
-/**
- * @title RedemptionEngine
- * @notice Burns DMD to unlock BTC from reserve vault
- * @dev Enforces burn-to-redeem mechanism, position-based unlocking
- */
+/// @title RedemptionEngine - Burns DMD to unlock tBTC from vault
+/// @dev User must burn ALL DMD minted from position to redeem tBTC
+/// @dev If user never claimed DMD, they can redeem without burning
 contract RedemptionEngine {
-    /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
-
     error InsufficientDMD();
     error PositionLocked();
     error PositionNotFound();
     error AlreadyRedeemed();
     error InvalidAmount();
 
-    /*//////////////////////////////////////////////////////////////
-                               STORAGE
-    //////////////////////////////////////////////////////////////*/
-
     IDMDToken public immutable dmdToken;
     IBTCReserveVault public immutable vault;
+    IMintDistributor public immutable mintDistributor;
 
-    // Track redemptions: user => positionId => redeemed
     mapping(address => mapping(uint256 => bool)) public redeemed;
-
-    // Track total burned per user for accounting
     mapping(address => uint256) public totalBurnedByUser;
 
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
+    event Redeemed(address indexed user, uint256 indexed positionId, uint256 tbtcAmount, uint256 dmdBurned);
 
-    event Redeemed(
-        address indexed user,
-        uint256 indexed positionId,
-        uint256 btcAmount,
-        uint256 dmdBurned
-    );
-
-    /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
-    constructor(IDMDToken _dmdToken, IBTCReserveVault _vault) {
-        if (address(_dmdToken) == address(0) || address(_vault) == address(0)) {
-            revert InvalidAmount();
-        }
+    constructor(IDMDToken _dmdToken, IBTCReserveVault _vault, IMintDistributor _mintDistributor) {
+        if (address(_dmdToken) == address(0) || address(_vault) == address(0) || address(_mintDistributor) == address(0)) revert InvalidAmount();
         dmdToken = _dmdToken;
         vault = _vault;
+        mintDistributor = _mintDistributor;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          REDEMPTION LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Burn DMD to unlock BTC from specific position
-     * @param positionId Position identifier in vault
-     * @param dmdAmount Amount of DMD to burn (must cover position weight)
-     * @dev User must have unlocked position and sufficient DMD balance
-     */
-    function redeem(uint256 positionId, uint256 dmdAmount) external {
-        if (dmdAmount == 0) revert InvalidAmount();
+    /// @notice Redeem tBTC by burning ALL DMD minted from position
+    /// @dev If no DMD was minted (user never claimed), redemption is free
+    /// @param positionId Position ID to redeem
+    function redeem(uint256 positionId) external {
         if (redeemed[msg.sender][positionId]) revert AlreadyRedeemed();
 
-        // Get position details from vault
-        (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
-            ,  // lockMonths (skip)
-            ,  // unlockTime (skip)
-            uint256 weight
-        ) = vault.getPosition(msg.sender, positionId);
-
-        if (btcAmount == 0) revert PositionNotFound();
+        (uint256 tbtcAmount,,,) = vault.getPosition(msg.sender, positionId);
+        if (tbtcAmount == 0) revert PositionNotFound();
         if (!vault.isUnlocked(msg.sender, positionId)) revert PositionLocked();
 
-        // Require burn amount >= position weight
-        if (dmdAmount < weight) revert InsufficientDMD();
+        uint256 requiredBurn = mintDistributor.getPositionDMDMinted(msg.sender, positionId);
 
-        // Mark as redeemed before external calls
         redeemed[msg.sender][positionId] = true;
-        totalBurnedByUser[msg.sender] += dmdAmount;
 
-        // Burn DMD from user
-        dmdToken.transferFrom(msg.sender, address(this), dmdAmount);
-        dmdToken.burn(dmdAmount);
-
-        // Unlock BTC from vault
-        vault.redeem(msg.sender, positionId);
-
-        emit Redeemed(msg.sender, positionId, btcAmount, dmdAmount);
-    }
-
-    /**
-     * @notice Batch redeem multiple positions
-     * @param positionIds Array of position identifiers
-     * @param dmdAmounts Array of DMD amounts to burn per position
-     */
-    function redeemMultiple(
-        uint256[] calldata positionIds,
-        uint256[] calldata dmdAmounts
-    ) external {
-        if (positionIds.length != dmdAmounts.length) revert InvalidAmount();
-
-        uint256 totalBurn = 0;
-
-        for (uint256 i = 0; i < positionIds.length; i++) {
-            uint256 positionId = positionIds[i];
-            uint256 dmdAmount = dmdAmounts[i];
-
-            if (dmdAmount == 0) continue;
-            if (redeemed[msg.sender][positionId]) continue;
-
-            (
-                ,  // btcAsset (skip)
-                uint256 btcAmount,
-                ,  // lockMonths (skip)
-                ,  // unlockTime (skip)
-                uint256 weight
-            ) = vault.getPosition(msg.sender, positionId);
-
-            if (btcAmount == 0) continue;
-            if (!vault.isUnlocked(msg.sender, positionId)) continue;
-            if (dmdAmount < weight) continue;
-
-            redeemed[msg.sender][positionId] = true;
-            totalBurn += dmdAmount;
-
-            vault.redeem(msg.sender, positionId);
-
-            emit Redeemed(msg.sender, positionId, btcAmount, dmdAmount);
+        // Only burn if DMD was minted to this position
+        if (requiredBurn > 0) {
+            totalBurnedByUser[msg.sender] += requiredBurn;
+            dmdToken.transferFrom(msg.sender, address(this), requiredBurn);
+            dmdToken.burn(requiredBurn);
         }
 
+        vault.redeem(msg.sender, positionId);
+        emit Redeemed(msg.sender, positionId, tbtcAmount, requiredBurn);
+    }
+
+    /// @notice Redeem multiple positions by burning ALL DMD minted from each
+    /// @dev Positions with no DMD minted can still be redeemed (free redemption)
+    /// @param positionIds Array of position IDs to redeem
+    function redeemMultiple(uint256[] calldata positionIds) external {
+        uint256 len = positionIds.length;
+        uint256 totalBurn = 0;
+        uint256[] memory burns = new uint256[](len);
+        bool[] memory shouldRedeem = new bool[](len);
+
+        // Calculate total burn and mark as redeemed
+        for (uint256 i = 0; i < len;) {
+            uint256 posId = positionIds[i];
+            if (redeemed[msg.sender][posId]) {
+                unchecked { ++i; }
+                continue;
+            }
+
+            (uint256 tbtcAmount,,,) = vault.getPosition(msg.sender, posId);
+            if (tbtcAmount == 0 || !vault.isUnlocked(msg.sender, posId)) {
+                unchecked { ++i; }
+                continue;
+            }
+
+            uint256 requiredBurn = mintDistributor.getPositionDMDMinted(msg.sender, posId);
+
+            redeemed[msg.sender][posId] = true;
+            shouldRedeem[i] = true;
+            burns[i] = requiredBurn;
+            totalBurn += requiredBurn;
+            unchecked { ++i; }
+        }
+
+        // Burn all DMD at once (if any)
         if (totalBurn > 0) {
             totalBurnedByUser[msg.sender] += totalBurn;
             dmdToken.transferFrom(msg.sender, address(this), totalBurn);
             dmdToken.burn(totalBurn);
         }
+
+        // Redeem positions and emit events
+        for (uint256 i = 0; i < len;) {
+            if (!shouldRedeem[i]) {
+                unchecked { ++i; }
+                continue;
+            }
+
+            (uint256 tbtcAmount,,,) = vault.getPosition(msg.sender, positionIds[i]);
+            vault.redeem(msg.sender, positionIds[i]);
+            emit Redeemed(msg.sender, positionIds[i], tbtcAmount, burns[i]);
+            unchecked { ++i; }
+        }
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Check if position has been redeemed
-     */
+    /// @notice Check if position has been redeemed
     function isRedeemed(address user, uint256 positionId) external view returns (bool) {
         return redeemed[user][positionId];
     }
 
-    /**
-     * @notice Calculate required DMD burn for position redemption
-     * @dev Returns position weight (minimum burn amount)
-     */
-    function getRequiredBurn(address user, uint256 positionId)
-        external
-        view
-        returns (uint256)
-    {
-        (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
-            ,  // lockMonths (skip)
-            ,  // unlockTime (skip)
-            uint256 weight
-        ) = vault.getPosition(user, positionId);
-
-        if (btcAmount == 0) return 0;
-        return weight;
+    /// @notice Get required DMD burn amount (all DMD minted to position)
+    /// @param user Position owner
+    /// @param positionId Position ID
+    /// @return Required DMD to burn
+    function getRequiredBurn(address user, uint256 positionId) external view returns (uint256) {
+        (uint256 tbtcAmount,,,) = vault.getPosition(user, positionId);
+        if (tbtcAmount == 0) return 0;
+        return mintDistributor.getPositionDMDMinted(user, positionId);
     }
 
-    /**
-     * @notice Check if position is redeemable
-     * @dev Checks: not already redeemed, position exists, lock expired, user has DMD
-     */
-    function isRedeemable(address user, uint256 positionId)
-        external
-        view
-        returns (bool)
-    {
+    /// @notice Check if position is redeemable
+    /// @param user Position owner
+    /// @param positionId Position ID
+    /// @return True if position can be redeemed
+    function isRedeemable(address user, uint256 positionId) external view returns (bool) {
         if (redeemed[user][positionId]) return false;
+        (uint256 tbtcAmount,,,) = vault.getPosition(user, positionId);
+        if (tbtcAmount == 0 || !vault.isUnlocked(user, positionId)) return false;
 
-        (
-            ,  // btcAsset (skip)
-            uint256 btcAmount,
-            ,  // lockMonths (skip)
-            ,  // unlockTime (skip)
-            uint256 weight
-        ) = vault.getPosition(user, positionId);
-
-        if (btcAmount == 0) return false;
-        if (!vault.isUnlocked(user, positionId)) return false;
-        if (dmdToken.balanceOf(user) < weight) return false;
-
-        return true;
-    }
-
-    /**
-     * @notice Get redemption status for user
-     */
-    function getUserRedemptionStats(address user)
-        external
-        view
-        returns (
-            uint256 totalBurned,
-            uint256 currentDMDBalance
-        )
-    {
-        return (
-            totalBurnedByUser[user],
-            dmdToken.balanceOf(user)
-        );
+        uint256 requiredBurn = mintDistributor.getPositionDMDMinted(user, positionId);
+        // Can redeem if no DMD minted OR if user has enough DMD to burn
+        return requiredBurn == 0 || dmdToken.balanceOf(user) >= requiredBurn;
     }
 }

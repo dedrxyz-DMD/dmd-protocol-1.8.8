@@ -3,282 +3,109 @@ pragma solidity 0.8.20;
 
 import "./interfaces/IDMDToken.sol";
 
-/**
- * @title VestingContract
- * @notice Diamond Vesting Curve (DVC): 5% at TGE, 95% linear over 7 years
- * @dev Supports multiple beneficiaries with fixed allocations
- */
+/// @title VestingContract - Diamond Vesting Curve: 5% TGE, 95% linear over 7 years
+/// @dev Fully decentralized, mints directly from DMDToken (no external funding needed)
+/// @dev Beneficiaries and allocations set immutably at deployment
 contract VestingContract {
-    /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error Unauthorized();
-    error InvalidAmount();
     error InvalidBeneficiary();
-    error AlreadyInitialized();
-    error NotStarted();
+    error InvalidAmount();
     error NothingToClaim();
-    error TransferFailed();
-
-    /*//////////////////////////////////////////////////////////////
-                               CONSTANTS
-    //////////////////////////////////////////////////////////////*/
+    error ArrayLengthMismatch();
+    error MintFailed();
 
     uint256 public constant TGE_PERCENT = 5;
     uint256 public constant VESTING_PERCENT = 95;
     uint256 public constant VESTING_DURATION = 7 * 365 days;
 
-    /*//////////////////////////////////////////////////////////////
-                               STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    address public immutable owner;
     IDMDToken public immutable dmdToken;
-
-    uint256 public tgeTime;
-    bool public initialized;
+    uint256 public immutable tgeTime;
+    uint256 public immutable totalAllocation;
 
     struct Beneficiary {
-        uint256 totalAllocation;    // Total DMD allocated
-        uint256 claimed;            // Amount already claimed
+        uint256 totalAllocation;
+        uint256 claimed;
     }
 
     mapping(address => Beneficiary) public beneficiaries;
     address[] public beneficiaryList;
 
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    event BeneficiaryAdded(address indexed beneficiary, uint256 allocation);
-    event VestingStarted(uint256 tgeTime);
     event Claimed(address indexed beneficiary, uint256 amount);
 
-    /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    constructor(IDMDToken _dmdToken, address[] memory _beneficiaries, uint256[] memory _allocations) {
+        if (address(_dmdToken) == address(0) || _beneficiaries.length == 0) revert InvalidBeneficiary();
+        if (_beneficiaries.length != _allocations.length) revert ArrayLengthMismatch();
 
-    constructor(address _owner, IDMDToken _dmdToken) {
-        if (_owner == address(0) || address(_dmdToken) == address(0)) {
-            revert InvalidBeneficiary();
-        }
-        owner = _owner;
         dmdToken = _dmdToken;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Add beneficiary with allocation (before TGE)
-     * @param beneficiary Beneficiary address
-     * @param allocation Total DMD allocation
-     */
-    function addBeneficiary(address beneficiary, uint256 allocation) external {
-        if (msg.sender != owner) revert Unauthorized();
-        if (initialized) revert AlreadyInitialized();
-        if (beneficiary == address(0)) revert InvalidBeneficiary();
-        if (allocation == 0) revert InvalidAmount();
-        if (beneficiaries[beneficiary].totalAllocation != 0) revert AlreadyInitialized();
-
-        beneficiaries[beneficiary] = Beneficiary({
-            totalAllocation: allocation,
-            claimed: 0
-        });
-
-        beneficiaryList.push(beneficiary);
-
-        emit BeneficiaryAdded(beneficiary, allocation);
-    }
-
-    /**
-     * @notice Start vesting (TGE)
-     * @dev Can only be called once by owner
-     */
-    function startVesting() external {
-        if (msg.sender != owner) revert Unauthorized();
-        if (initialized) revert AlreadyInitialized();
-        if (beneficiaryList.length == 0) revert InvalidBeneficiary();
-
-        initialized = true;
         tgeTime = block.timestamp;
 
-        emit VestingStarted(tgeTime);
+        uint256 total = 0;
+        for (uint256 i = 0; i < _beneficiaries.length; i++) {
+            if (_beneficiaries[i] == address(0)) revert InvalidBeneficiary();
+            if (_allocations[i] == 0) revert InvalidAmount();
+            if (beneficiaries[_beneficiaries[i]].totalAllocation != 0) revert InvalidBeneficiary();
+
+            beneficiaries[_beneficiaries[i]] = Beneficiary(_allocations[i], 0);
+            beneficiaryList.push(_beneficiaries[i]);
+            total += _allocations[i];
+        }
+        totalAllocation = total;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          CLAIMING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Claim vested DMD
-     * @dev Beneficiary calls to receive their vested tokens
-     */
+    /// @notice Claim vested DMD (mints directly, no external funding needed)
     function claim() external {
-        if (!initialized) revert NotStarted();
-
-        Beneficiary storage beneficiary = beneficiaries[msg.sender];
-        if (beneficiary.totalAllocation == 0) revert InvalidBeneficiary();
-
-        uint256 vested = _vestedAmount(msg.sender);
-        uint256 claimable = vested - beneficiary.claimed;
-
-        if (claimable == 0) revert NothingToClaim();
-
-        beneficiary.claimed += claimable;
-
-        bool success = dmdToken.transfer(msg.sender, claimable);
-        if (!success) revert TransferFailed();
-
-        emit Claimed(msg.sender, claimable);
-    }
-
-    /**
-     * @notice Claim on behalf of beneficiary (anyone can trigger)
-     * @param beneficiary Address to claim for
-     */
-    function claimFor(address beneficiary) external {
-        if (!initialized) revert NotStarted();
-
-        Beneficiary storage ben = beneficiaries[beneficiary];
+        Beneficiary storage ben = beneficiaries[msg.sender];
         if (ben.totalAllocation == 0) revert InvalidBeneficiary();
 
-        uint256 vested = _vestedAmount(beneficiary);
-        uint256 claimable = vested - ben.claimed;
-
+        uint256 claimable = _vestedAmount(msg.sender) - ben.claimed;
         if (claimable == 0) revert NothingToClaim();
 
         ben.claimed += claimable;
+        dmdToken.mint(msg.sender, claimable);
+        emit Claimed(msg.sender, claimable);
+    }
 
-        bool success = dmdToken.transfer(beneficiary, claimable);
-        if (!success) revert TransferFailed();
+    /// @notice Claim on behalf of beneficiary (anyone can trigger)
+    function claimFor(address beneficiary) external {
+        Beneficiary storage ben = beneficiaries[beneficiary];
+        if (ben.totalAllocation == 0) revert InvalidBeneficiary();
 
+        uint256 claimable = _vestedAmount(beneficiary) - ben.claimed;
+        if (claimable == 0) revert NothingToClaim();
+
+        ben.claimed += claimable;
+        dmdToken.mint(beneficiary, claimable);
         emit Claimed(beneficiary, claimable);
     }
 
-    /**
-     * @notice Batch claim for multiple beneficiaries
-     */
-    function claimMultiple(address[] calldata _beneficiaries) external {
-        if (!initialized) revert NotStarted();
-
-        for (uint256 i = 0; i < _beneficiaries.length; i++) {
-            address beneficiary = _beneficiaries[i];
-            Beneficiary storage ben = beneficiaries[beneficiary];
-
-            if (ben.totalAllocation == 0) continue;
-
-            uint256 vested = _vestedAmount(beneficiary);
-            uint256 claimable = vested - ben.claimed;
-
-            if (claimable == 0) continue;
-
-            ben.claimed += claimable;
-            
-            bool success = dmdToken.transfer(beneficiary, claimable);
-            if (!success) continue;
-
-            emit Claimed(beneficiary, claimable);
-        }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Get claimable amount for beneficiary
-     */
     function getClaimable(address beneficiary) external view returns (uint256) {
-        if (!initialized) return 0;
-        
         Beneficiary memory ben = beneficiaries[beneficiary];
         if (ben.totalAllocation == 0) return 0;
-
         uint256 vested = _vestedAmount(beneficiary);
         return vested > ben.claimed ? vested - ben.claimed : 0;
     }
 
-    /**
-     * @notice Get vested amount (total unlocked so far)
-     */
-    function getVested(address beneficiary) external view returns (uint256) {
-        if (!initialized) return 0;
-        return _vestedAmount(beneficiary);
-    }
+    function getVested(address beneficiary) external view returns (uint256) { return _vestedAmount(beneficiary); }
 
-    /**
-     * @notice Get beneficiary details
-     */
-    function getBeneficiary(address beneficiary) 
-        external 
-        view 
-        returns (
-            uint256 totalAllocation,
-            uint256 claimed,
-            uint256 vested,
-            uint256 claimable
-        ) 
-    {
+    function getBeneficiary(address beneficiary) external view returns (uint256, uint256, uint256, uint256) {
         Beneficiary memory ben = beneficiaries[beneficiary];
-        totalAllocation = ben.totalAllocation;
-        claimed = ben.claimed;
-        
-        if (initialized) {
-            vested = _vestedAmount(beneficiary);
-            claimable = vested > claimed ? vested - claimed : 0;
-        }
+        uint256 vested = _vestedAmount(beneficiary);
+        return (ben.totalAllocation, ben.claimed, vested, vested > ben.claimed ? vested - ben.claimed : 0);
     }
 
-    /**
-     * @notice Get all beneficiaries
-     */
-    function getAllBeneficiaries() external view returns (address[] memory) {
-        return beneficiaryList;
-    }
-
-    /**
-     * @notice Get total number of beneficiaries
-     */
-    function getBeneficiaryCount() external view returns (uint256) {
-        return beneficiaryList.length;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        INTERNAL CALCULATIONS
-    //////////////////////////////////////////////////////////////*/
+    function getAllBeneficiaries() external view returns (address[] memory) { return beneficiaryList; }
+    function getBeneficiaryCount() external view returns (uint256) { return beneficiaryList.length; }
 
     function _vestedAmount(address beneficiary) internal view returns (uint256) {
         Beneficiary memory ben = beneficiaries[beneficiary];
-        
-        // Calculate TGE amount (5%)
+        if (ben.totalAllocation == 0 || block.timestamp < tgeTime) return 0;
+
         uint256 tgeAmount = (ben.totalAllocation * TGE_PERCENT) / 100;
+        if (block.timestamp == tgeTime) return tgeAmount;
 
-        // If vesting hasn't started, return 0
-        if (block.timestamp < tgeTime) {
-            return 0;
-        }
-
-        // TGE immediate unlock
-        if (block.timestamp == tgeTime) {
-            return tgeAmount;
-        }
-
-        // Calculate vesting amount (95%)
-        uint256 vestingAmount = (ben.totalAllocation * VESTING_PERCENT) / 100;
-        
         uint256 elapsed = block.timestamp - tgeTime;
+        if (elapsed >= VESTING_DURATION) return ben.totalAllocation;
 
-        // If vesting complete, return full allocation
-        if (elapsed >= VESTING_DURATION) {
-            return ben.totalAllocation;
-        }
-
-        // Linear vesting: tgeAmount + (vestingAmount * elapsed / duration)
-        uint256 vestedFromSchedule = (vestingAmount * elapsed) / VESTING_DURATION;
-        
-        return tgeAmount + vestedFromSchedule;
+        uint256 vestingAmount = (ben.totalAllocation * VESTING_PERCENT) / 100;
+        return tgeAmount + (vestingAmount * elapsed) / VESTING_DURATION;
     }
 }

@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import "forge-std/Script.sol";
 import "../src/DMDToken.sol";
 import "../src/BTCReserveVault.sol";
-import "../src/BTCAssetRegistry.sol";
 import "../src/EmissionScheduler.sol";
 import "../src/MintDistributor.sol";
 import "../src/RedemptionEngine.sol";
@@ -12,11 +11,12 @@ import "../src/VestingContract.sol";
 import "../src/interfaces/IDMDToken.sol";
 import "../src/interfaces/IBTCReserveVault.sol";
 import "../src/interfaces/IEmissionScheduler.sol";
+import "../src/interfaces/IMintDistributor.sol";
 
-contract MockWBTC {
-    string public constant name = "Wrapped Bitcoin";
-    string public constant symbol = "WBTC";
-    uint8 public constant decimals = 8;
+contract MockTBTC {
+    string public constant name = "Mock tBTC";
+    string public constant symbol = "tBTC";
+    uint8 public constant decimals = 18;
 
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
@@ -38,7 +38,7 @@ contract MockWBTC {
     }
 
     function transfer(address to, uint256 amount) external returns (bool) {
-        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        require(balanceOf[msg.sender] >= amount, "Insufficient");
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         emit Transfer(msg.sender, to, amount);
@@ -46,8 +46,7 @@ contract MockWBTC {
     }
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(balanceOf[from] >= amount, "Insufficient balance");
-        require(allowance[from][msg.sender] >= amount, "Insufficient allowance");
+        require(balanceOf[from] >= amount && allowance[from][msg.sender] >= amount, "Insufficient");
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
         allowance[from][msg.sender] -= amount;
@@ -56,10 +55,10 @@ contract MockWBTC {
     }
 }
 
+/// @title DeployDMDFresh - DMD Protocol v1.8.8 Deployment
+/// @dev tBTC-only, fully decentralized, no admin
 contract DeployDMDFresh is Script {
-    // Store deployed contracts as state variables
-    MockWBTC public wbtc;
-    BTCAssetRegistry public assetRegistry;
+    MockTBTC public tbtc;
     BTCReserveVault public vault;
     EmissionScheduler public scheduler;
     MintDistributor public distributor;
@@ -67,158 +66,67 @@ contract DeployDMDFresh is Script {
     RedemptionEngine public redemption;
     VestingContract public vesting;
 
+    address constant MAINNET_TBTC = 0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b;
+
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(pk);
 
-        _printHeader(deployer);
+        console.log("DMD Protocol v1.8.8 | Deployer:", deployer);
+        require(deployer.balance >= 0.01 ether, "Need 0.01 ETH");
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast(pk);
 
-        _deployMockWBTC();
-        _deployProtocol(deployer);
-        _initializeSystem();
-        _mintTestTokens(deployer);
+        // Deploy MockTBTC for testnet
+        tbtc = new MockTBTC();
+        console.log("MockTBTC:", address(tbtc));
+
+        // Compute addresses for circular dependencies
+        // Order: Vault, Scheduler, Distributor, Token, Redemption, Vesting
+        uint256 nonce = vm.getNonce(deployer);
+        address pVault = vm.computeCreateAddress(deployer, nonce);
+        address pScheduler = vm.computeCreateAddress(deployer, nonce + 1);
+        address pDistributor = vm.computeCreateAddress(deployer, nonce + 2);
+        address pToken = vm.computeCreateAddress(deployer, nonce + 3);
+        address pRedemption = vm.computeCreateAddress(deployer, nonce + 4);
+        address pVesting = vm.computeCreateAddress(deployer, nonce + 5);
+
+        // Deploy contracts in order
+        vault = new BTCReserveVault(address(tbtc), pRedemption);
+        require(address(vault) == pVault, "Vault mismatch");
+
+        scheduler = new EmissionScheduler(pDistributor);
+        require(address(scheduler) == pScheduler, "Scheduler mismatch");
+
+        distributor = new MintDistributor(IDMDToken(pToken), IBTCReserveVault(address(vault)), IEmissionScheduler(address(scheduler)));
+        require(address(distributor) == pDistributor, "Distributor mismatch");
+
+        // DMDToken now takes both distributor and vesting addresses
+        dmdToken = new DMDToken(address(distributor), pVesting);
+        require(address(dmdToken) == pToken, "Token mismatch");
+
+        redemption = new RedemptionEngine(IDMDToken(address(dmdToken)), IBTCReserveVault(address(vault)), IMintDistributor(address(distributor)));
+        require(address(redemption) == pRedemption, "Redemption mismatch");
+
+        // VestingContract - can now mint directly (no external funding needed)
+        address[] memory bens = new address[](1);
+        uint256[] memory allocs = new uint256[](1);
+        bens[0] = deployer;
+        allocs[0] = 3_600_000e18; // 3.6M DMD for team (20% of max supply)
+        vesting = new VestingContract(IDMDToken(address(dmdToken)), bens, allocs);
+        require(address(vesting) == pVesting, "Vesting mismatch");
+
+        // Mint test tBTC
+        tbtc.mint(deployer, 100e18);
 
         vm.stopBroadcast();
 
-        _saveDeployment(deployer);
-        _printSummary();
-    }
-
-    function _printHeader(address deployer) internal view {
-        console.log("=====================================");
-        console.log("DMD PROTOCOL - FRESH DEPLOYMENT");
-        console.log("Multi-Asset BTC Support Enabled");
-        console.log("=====================================");
-        console.log("Network: Base Sepolia");
-        console.log("Deployer:", deployer);
-        console.log("Balance:", deployer.balance / 1e18, "ETH");
-        console.log("");
-
-        require(deployer.balance >= 0.05 ether, "Need at least 0.05 ETH");
-    }
-
-    function _deployMockWBTC() internal {
-        console.log("Step 1: Deploying MockWBTC...");
-        wbtc = new MockWBTC();
-        console.log("  MockWBTC:", address(wbtc));
-        console.log("");
-    }
-
-    function _deployProtocol(address deployer) internal {
-        console.log("Step 2: Deploying protocol contracts...");
-
-        uint256 nonce = vm.getNonce(deployer);
-        address pAssetRegistry = vm.computeCreateAddress(deployer, nonce);
-        address pVault = vm.computeCreateAddress(deployer, nonce + 1);
-        address pScheduler = vm.computeCreateAddress(deployer, nonce + 2);
-        address pDistributor = vm.computeCreateAddress(deployer, nonce + 3);
-        address pToken = vm.computeCreateAddress(deployer, nonce + 4);
-        address pRedemption = vm.computeCreateAddress(deployer, nonce + 5);
-
-        // Deploy BTCAssetRegistry
-        assetRegistry = new BTCAssetRegistry();
-        console.log("  [1/7] AssetRegistry:", address(assetRegistry));
-
-        // Deploy Vault with asset registry
-        vault = new BTCReserveVault(pAssetRegistry, pRedemption);
-        console.log("  [2/7] Vault:", address(vault));
-
-        scheduler = new EmissionScheduler(deployer, pDistributor);
-        console.log("  [3/7] Scheduler:", address(scheduler));
-
-        distributor = new MintDistributor(
-            deployer,
-            IDMDToken(pToken),
-            IBTCReserveVault(address(vault)),
-            IEmissionScheduler(address(scheduler))
-        );
-        console.log("  [4/7] Distributor:", address(distributor));
-
-        dmdToken = new DMDToken(address(distributor));
-        console.log("  [5/7] DMDToken:", address(dmdToken));
-
-        redemption = new RedemptionEngine(
-            IDMDToken(address(dmdToken)),
-            IBTCReserveVault(address(vault))
-        );
-        console.log("  [6/7] Redemption:", address(redemption));
-
-        vesting = new VestingContract(deployer, IDMDToken(address(dmdToken)));
-        console.log("  [7/7] Vesting:", address(vesting));
-
-        require(address(assetRegistry) == pAssetRegistry, "AssetRegistry mismatch");
-        require(address(vault) == pVault, "Vault mismatch");
-        require(address(scheduler) == pScheduler, "Scheduler mismatch");
-        require(address(distributor) == pDistributor, "Distributor mismatch");
-        require(address(dmdToken) == pToken, "Token mismatch");
-        require(address(redemption) == pRedemption, "Redemption mismatch");
-
-        console.log("  All addresses verified!");
-        console.log("");
-    }
-
-    function _initializeSystem() internal {
-        console.log("Step 3: Initializing system...");
-
-        // Add WBTC as approved asset
-        assetRegistry.addBTCAsset(address(wbtc), false, "WBTC");
-        console.log("  WBTC added to asset registry");
-
-        scheduler.startEmissions();
-        console.log("  Emissions started");
-
-        distributor.startDistribution();
-        console.log("  Distribution started");
-        console.log("");
-    }
-
-    function _mintTestTokens(address deployer) internal {
-        console.log("Step 4: Minting test WBTC...");
-        wbtc.mint(deployer, 100 * 1e8);
-        console.log("  Minted 100 WBTC");
-        console.log("");
-    }
-
-    function _saveDeployment(address deployer) internal {
-        console.log("Step 5: Saving deployment...");
-
-        string memory info = string.concat(
-            "# DMD Protocol Deployment - Multi-Asset\n",
-            "WBTC=", vm.toString(address(wbtc)), "\n",
-            "ASSET_REGISTRY=", vm.toString(address(assetRegistry)), "\n",
-            "DMD_TOKEN=", vm.toString(address(dmdToken)), "\n",
-            "VAULT=", vm.toString(address(vault)), "\n",
-            "SCHEDULER=", vm.toString(address(scheduler)), "\n",
-            "DISTRIBUTOR=", vm.toString(address(distributor)), "\n",
-            "REDEMPTION=", vm.toString(address(redemption)), "\n",
-            "VESTING=", vm.toString(address(vesting)), "\n"
-        );
-
-        vm.writeFile("deployments/testnet-deployment.env", info);
-        console.log("  Saved to deployments/testnet-deployment.env");
-        console.log("");
-    }
-
-    function _printSummary() internal view {
-        console.log("=====================================");
-        console.log("DEPLOYMENT SUCCESSFUL!");
-        console.log("=====================================");
-        console.log("");
-        console.log("WBTC:          ", address(wbtc));
-        console.log("AssetRegistry: ", address(assetRegistry));
-        console.log("DMDToken:      ", address(dmdToken));
-        console.log("Vault:         ", address(vault));
-        console.log("Scheduler:     ", address(scheduler));
-        console.log("Distributor:   ", address(distributor));
-        console.log("Redemption:    ", address(redemption));
-        console.log("Vesting:       ", address(vesting));
-        console.log("");
-        console.log("Next steps:");
-        console.log("1. Verify contracts on Basescan");
-        console.log("2. Test WBTC locking: vault.lock(WBTC, amount, months)");
-        console.log("3. Add more BTC assets: assetRegistry.addBTCAsset()");
-        console.log("");
+        // Log addresses
+        console.log("Vault:", address(vault));
+        console.log("Scheduler:", address(scheduler));
+        console.log("Distributor:", address(distributor));
+        console.log("DMDToken:", address(dmdToken));
+        console.log("Redemption:", address(redemption));
+        console.log("Vesting:", address(vesting));
     }
 }

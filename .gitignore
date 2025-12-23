@@ -1,0 +1,25 @@
+# Compiler output
+/out
+/cache
+
+# Dependencies
+/lib
+
+# Environment files (sensitive data)
+.env
+.env.local
+.env.*.local
+
+# Broadcast files (deployment transactions)
+/broadcast
+
+# Coverage
+/coverage
+
+# IDE
+.idea
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
