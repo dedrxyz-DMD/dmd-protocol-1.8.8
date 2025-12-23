@@ -19,4 +19,9 @@ interface IBTCReserveVault {
     function updateVestedWeightCache(uint256 startIndex, uint256 maxUsers) external returns (uint256, bool);
     function cachedTotalVestedWeight() external view returns (uint256);
     function lastWeightCacheUpdate() external view returns (uint256);
+    function requestEarlyUnlock(uint256 positionId) external;
+    function cancelEarlyUnlock(uint256 positionId) external;
+    function earlyUnlockRequestTime(address user, uint256 positionId) external view returns (uint256);
+    function getEarlyUnlockStatus(address user, uint256 positionId) external view returns (bool requested, uint256 readyTime, bool isReady);
+    function EARLY_UNLOCK_DELAY() external view returns (uint256);
 }

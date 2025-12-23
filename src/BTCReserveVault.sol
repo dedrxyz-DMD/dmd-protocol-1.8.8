@@ -20,6 +20,9 @@ contract BTCReserveVault {
     error PositionNotFound();
     error PositionLocked();
     error Unauthorized();
+    error AlreadyRequestedEarlyUnlock();
+    error NoEarlyUnlockRequested();
+    error EarlyUnlockNotReady();
 
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
@@ -37,6 +40,8 @@ contract BTCReserveVault {
     uint256 public constant WEIGHT_VESTING_PERIOD = 3 days;
     /// @notice Maximum lock duration allowed (60 months = 5 years)
     uint256 public constant MAX_LOCK_MONTHS = 60;
+    /// @notice Delay period for early unlock requests (30 days)
+    uint256 public constant EARLY_UNLOCK_DELAY = 30 days;
 
     /*//////////////////////////////////////////////////////////////
                                 IMMUTABLES
@@ -91,6 +96,8 @@ contract BTCReserveVault {
     address[] public allUsers;
     /// @notice Whether address has locked before
     mapping(address => bool) public isUser;
+    /// @notice Early unlock request time: user => positionId => requestTime (0 = no request)
+    mapping(address => mapping(uint256 => uint256)) public earlyUnlockRequestTime;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -104,6 +111,10 @@ contract BTCReserveVault {
     event Redeemed(address indexed user, uint256 indexed positionId, uint256 amount);
     /// @notice Emitted when vested weight cache is updated
     event WeightCacheUpdated(uint256 totalVestedWeight, uint256 usersProcessed, uint256 timestamp);
+    /// @notice Emitted when early unlock is requested
+    event EarlyUnlockRequested(address indexed user, uint256 indexed positionId, uint256 unlockTime);
+    /// @notice Emitted when early unlock is cancelled
+    event EarlyUnlockCancelled(address indexed user, uint256 indexed positionId);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -162,12 +173,25 @@ contract BTCReserveVault {
 
         Position memory pos = positions[user][positionId];
         if (pos.amount == 0) revert PositionNotFound();
-        if (block.timestamp < pos.lockTime + (pos.lockMonths * 30 days)) revert PositionLocked();
+
+        // Check if unlocked: normal unlock OR early unlock (30-day delay passed)
+        bool normalUnlock = block.timestamp >= pos.lockTime + (pos.lockMonths * 30 days);
+        uint256 requestTime = earlyUnlockRequestTime[user][positionId];
+        bool earlyUnlock = requestTime != 0 && block.timestamp >= requestTime + EARLY_UNLOCK_DELAY;
+
+        if (!normalUnlock && !earlyUnlock) revert PositionLocked();
 
         delete positions[user][positionId];
-        totalWeightOf[user] -= pos.weight;
         totalLocked -= pos.amount;
-        totalSystemWeight -= pos.weight;
+
+        // Only subtract weight if NOT early unlock (early unlock already removed weight)
+        if (requestTime == 0) {
+            totalWeightOf[user] -= pos.weight;
+            totalSystemWeight -= pos.weight;
+        } else {
+            // Clear early unlock request
+            delete earlyUnlockRequestTime[user][positionId];
+        }
 
         // Remove from active positions (swap and pop)
         uint256 index = positionIndex[user][positionId];
@@ -184,6 +208,44 @@ contract BTCReserveVault {
         emit Redeemed(user, positionId, pos.amount);
     }
 
+    /// @notice Request early unlock for a position (30-day waiting period)
+    /// @dev Weight is removed immediately upon request. User stops earning rewards.
+    /// @param positionId Position ID to request early unlock for
+    function requestEarlyUnlock(uint256 positionId) external {
+        Position memory pos = positions[msg.sender][positionId];
+        if (pos.amount == 0) revert PositionNotFound();
+        if (earlyUnlockRequestTime[msg.sender][positionId] != 0) revert AlreadyRequestedEarlyUnlock();
+
+        // Check if already unlocked normally (no need for early unlock)
+        if (block.timestamp >= pos.lockTime + (pos.lockMonths * 30 days)) revert PositionLocked();
+
+        // Set early unlock request time
+        earlyUnlockRequestTime[msg.sender][positionId] = block.timestamp;
+
+        // Remove weight from system immediately (user stops earning rewards)
+        totalWeightOf[msg.sender] -= pos.weight;
+        totalSystemWeight -= pos.weight;
+
+        emit EarlyUnlockRequested(msg.sender, positionId, block.timestamp + EARLY_UNLOCK_DELAY);
+    }
+
+    /// @notice Cancel early unlock request and restore weight
+    /// @param positionId Position ID to cancel early unlock for
+    function cancelEarlyUnlock(uint256 positionId) external {
+        Position memory pos = positions[msg.sender][positionId];
+        if (pos.amount == 0) revert PositionNotFound();
+        if (earlyUnlockRequestTime[msg.sender][positionId] == 0) revert NoEarlyUnlockRequested();
+
+        // Clear early unlock request
+        delete earlyUnlockRequestTime[msg.sender][positionId];
+
+        // Restore weight to system
+        totalWeightOf[msg.sender] += pos.weight;
+        totalSystemWeight += pos.weight;
+
+        emit EarlyUnlockCancelled(msg.sender, positionId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                              VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -191,10 +253,13 @@ contract BTCReserveVault {
     /// @notice Get vested weight for a single position
     /// @param user Position owner
     /// @param positionId Position ID
-    /// @return Vested weight (0 during warmup, linear during vesting, full after)
+    /// @return Vested weight (0 during warmup, 0 if early unlock requested, linear during vesting, full after)
     function getPositionVestedWeight(address user, uint256 positionId) public view returns (uint256) {
         Position memory pos = positions[user][positionId];
         if (pos.amount == 0) return 0;
+
+        // If early unlock requested, weight is 0 (already removed from system)
+        if (earlyUnlockRequestTime[user][positionId] != 0) return 0;
 
         uint256 elapsed = block.timestamp - pos.lockTime;
         if (elapsed < WEIGHT_WARMUP_PERIOD) return 0;
@@ -303,13 +368,22 @@ contract BTCReserveVault {
         return (amount * (WEIGHT_BASE + (months * WEIGHT_PER_MONTH))) / WEIGHT_BASE;
     }
 
-    /// @notice Check if position is unlocked
+    /// @notice Check if position is unlocked (normal or early unlock)
     /// @param user Position owner
     /// @param positionId Position ID
-    /// @return True if position exists and lock period has passed
+    /// @return True if position exists and (lock period passed OR early unlock ready)
     function isUnlocked(address user, uint256 positionId) external view returns (bool) {
         Position memory pos = positions[user][positionId];
-        return pos.amount > 0 && block.timestamp >= pos.lockTime + (pos.lockMonths * 30 days);
+        if (pos.amount == 0) return false;
+
+        // Normal unlock: lock period has passed
+        if (block.timestamp >= pos.lockTime + (pos.lockMonths * 30 days)) return true;
+
+        // Early unlock: request made and 30-day delay passed
+        uint256 requestTime = earlyUnlockRequestTime[user][positionId];
+        if (requestTime != 0 && block.timestamp >= requestTime + EARLY_UNLOCK_DELAY) return true;
+
+        return false;
     }
 
     /// @notice Check if position weight is fully vested
@@ -335,4 +409,19 @@ contract BTCReserveVault {
 
     /// @notice Get total registered user count
     function getTotalUsers() external view returns (uint256) { return allUsers.length; }
+
+    /// @notice Get early unlock status for a position
+    /// @param user Position owner
+    /// @param positionId Position ID
+    /// @return requested True if early unlock was requested
+    /// @return readyTime Timestamp when early unlock will be ready (0 if not requested)
+    /// @return isReady True if early unlock is ready now
+    function getEarlyUnlockStatus(address user, uint256 positionId) external view returns (bool requested, uint256 readyTime, bool isReady) {
+        uint256 requestTime = earlyUnlockRequestTime[user][positionId];
+        if (requestTime == 0) {
+            return (false, 0, false);
+        }
+        uint256 ready = requestTime + EARLY_UNLOCK_DELAY;
+        return (true, ready, block.timestamp >= ready);
+    }
 }
