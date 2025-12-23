@@ -9,6 +9,7 @@ This guide covers deploying the DMD Protocol to Base Sepolia testnet and Base ma
 - Fully decentralized (no owner, admin, or governance)
 - Emissions auto-start at deployment
 - Flash loan protection (7-day warmup + 3-day vesting)
+- Early unlock option (30-day waiting period)
 
 ## Prerequisites
 
@@ -170,6 +171,7 @@ MintDistributor(distributorAddress).claim(epochId);
 | CEI Pattern | All external calls made after state changes |
 | Hard Emission Cap | 14.4M DMD maximum ever minted |
 | Immutable tBTC | Token address cannot be changed after deployment |
+| Early Unlock | 30-day waiting period, weight removed immediately on request |
 
 ## Gas Estimates
 
@@ -180,6 +182,8 @@ MintDistributor(distributorAddress).claim(epochId);
 | finalizeEpoch() | ~100,000 |
 | claim() | ~80,000 |
 | redeem() | ~120,000 |
+| requestEarlyUnlock() | ~50,000 |
+| cancelEarlyUnlock() | ~40,000 |
 
 ## Troubleshooting
 
