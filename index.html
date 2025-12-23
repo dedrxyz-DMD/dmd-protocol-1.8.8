@@ -421,14 +421,21 @@
                 <div class="card">
                     <h3>Early Unlock</h3>
                     <div class="info-box">
-                        <h4>Warning</h4>
-                        <p>Early unlock removes your position's weight from future emissions. Your accumulated DMD claims are not affected.</p>
+                        <h4>How Early Unlock Works</h4>
+                        <p><strong>Request Early Unlock:</strong> Starts a 30-day waiting period. Your weight is removed immediately (no more rewards).<br>
+                        <strong>Cancel Early Unlock:</strong> Cancels the request and restores your weight.<br>
+                        <strong>After 30 days:</strong> Position becomes redeemable.</p>
                     </div>
                     <div class="form-group">
                         <label>Position ID</label>
-                        <input type="number" id="unlockPositionId" placeholder="0">
+                        <input type="number" id="unlockPositionId" placeholder="0" oninput="checkEarlyUnlockStatus()">
                     </div>
-                    <button class="btn btn-danger" onclick="earlyUnlock()">Early Unlock</button>
+                    <div id="earlyUnlockInfo" class="stat" style="margin-bottom: 15px; display: none;">
+                        <div class="stat-label">Early Unlock Status</div>
+                        <div class="stat-value" id="earlyUnlockStatusText">-</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="requestEarlyUnlock()">Request Early Unlock</button>
+                    <button class="btn btn-secondary" onclick="cancelEarlyUnlock()" style="margin-top: 5px;">Cancel Early Unlock</button>
                     <div id="unlockStatus" class="status hidden"></div>
                 </div>
             </div>
@@ -760,7 +767,7 @@
     </div>
 
     <script>
-        // Contract addresses
+        // Contract addresses (Base Mainnet)
         const CONTRACTS = {
             DMDToken: '0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC',
             BTCReserveVault: '0x06e0cd192d613636562629c1fb3536bC7271c829',
@@ -771,16 +778,34 @@
             tBTC: '0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b'
         };
 
-        // ABIs (simplified for common functions)
+        // Base Mainnet Chain ID
+        const BASE_CHAIN_ID = 8453;
+        const BASE_CHAIN_HEX = '0x2105';
+
+        // Multiple RPC endpoints for reliability (ordered by reliability)
+        const RPC_ENDPOINTS = [
+            'https://base.llamarpc.com',
+            'https://1rpc.io/base',
+            'https://base.meowrpc.com',
+            'https://base-mainnet.public.blastapi.io',
+            'https://base.drpc.org',
+            'https://mainnet.base.org'
+        ];
+
+        // ABIs (matching deployed contract functions)
         const ABIS = {
             ERC20: [
                 'function balanceOf(address) view returns (uint256)',
                 'function totalSupply() view returns (uint256)',
                 'function approve(address spender, uint256 amount) returns (bool)',
                 'function transfer(address to, uint256 amount) returns (bool)',
-                'function allowance(address owner, address spender) view returns (uint256)'
+                'function allowance(address owner, address spender) view returns (uint256)',
+                'function decimals() view returns (uint8)'
             ],
             DMDToken: [
+                'function name() view returns (string)',
+                'function symbol() view returns (string)',
+                'function decimals() view returns (uint8)',
                 'function balanceOf(address) view returns (uint256)',
                 'function totalSupply() view returns (uint256)',
                 'function totalMinted() view returns (uint256)',
@@ -788,7 +813,9 @@
                 'function MAX_SUPPLY() view returns (uint256)',
                 'function approve(address spender, uint256 amount) returns (bool)',
                 'function transfer(address to, uint256 amount) returns (bool)',
-                'function burn(uint256 amount)'
+                'function transferFrom(address from, address to, uint256 amount) returns (bool)',
+                'function burn(uint256 amount)',
+                'function allowance(address owner, address spender) view returns (uint256)'
             ],
             BTCReserveVault: [
                 'function lock(uint256 amount, uint256 lockMonths) returns (uint256)',
@@ -796,15 +823,23 @@
                 'function cancelEarlyUnlock(uint256 positionId)',
                 'function getPosition(address user, uint256 positionId) view returns (uint256 amount, uint256 lockMonths, uint256 unlockTime, uint256 weight)',
                 'function getActivePositions(address user) view returns (uint256[])',
+                'function getPositionVestedWeight(address user, uint256 positionId) view returns (uint256)',
                 'function totalLocked() view returns (uint256)',
                 'function totalSystemWeight() view returns (uint256)',
                 'function getTotalVestedWeight() view returns (uint256)',
                 'function getVestedWeight(address user) view returns (uint256)',
-                'function totalWeightOf(address user) view returns (uint256)',
+                'function totalWeightOf(address) view returns (uint256)',
                 'function isUnlocked(address user, uint256 positionId) view returns (bool)',
-                'function calculateWeight(uint256 amount, uint256 lockMonths) view returns (uint256)',
+                'function isWeightFullyVested(address user, uint256 positionId) view returns (bool)',
+                'function calculateWeight(uint256 amount, uint256 lockMonths) pure returns (uint256)',
                 'function getTotalUsers() view returns (uint256)',
-                'function getActivePositionCount(address user) view returns (uint256)'
+                'function getTotalLocked() view returns (uint256)',
+                'function getUserPositionCount(address user) view returns (uint256)',
+                'function getActivePositionCount(address user) view returns (uint256)',
+                'function getEarlyUnlockStatus(address user, uint256 positionId) view returns (bool requested, uint256 readyTime, bool isReady)',
+                'function EARLY_UNLOCK_DELAY() view returns (uint256)',
+                'function WEIGHT_WARMUP_PERIOD() view returns (uint256)',
+                'function WEIGHT_VESTING_PERIOD() view returns (uint256)'
             ],
             EmissionScheduler: [
                 'function totalEmitted() view returns (uint256)',
@@ -849,79 +884,187 @@
 
         let provider, signer, userAddress;
         let contracts = {};
+        let readOnlyProvider = null;
+        let isConnecting = false;
 
-        // Initialize
+        // Get a working RPC provider
+        async function getReadOnlyProvider() {
+            if (readOnlyProvider) return readOnlyProvider;
+
+            for (const rpc of RPC_ENDPOINTS) {
+                try {
+                    const testProvider = new ethers.providers.JsonRpcProvider(rpc);
+                    // Set a timeout for the test
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Timeout')), 5000)
+                    );
+                    await Promise.race([testProvider.getBlockNumber(), timeoutPromise]);
+                    readOnlyProvider = testProvider;
+                    console.log('Connected to RPC:', rpc);
+                    return readOnlyProvider;
+                } catch (e) {
+                    console.warn('RPC failed:', rpc, e.message);
+                }
+            }
+            throw new Error('All RPC endpoints failed. Please try again later.');
+        }
+
+        // Initialize the app
         async function init() {
+            console.log('Initializing DMD Protocol app...');
+
             // Check if ethers loaded properly
             if (typeof ethers === 'undefined') {
                 console.error('ethers.js failed to load');
-                alert('Failed to load ethers.js library. Please refresh the page.');
+                showGlobalError('Failed to load ethers.js library. Please refresh the page.');
                 return;
+            }
+            console.log('ethers.js loaded successfully, version:', ethers.version);
+
+            // Update connect button to show loading state during init
+            const connectBtn = document.getElementById('connectBtn');
+            if (connectBtn) {
+                connectBtn.textContent = 'Loading...';
+                connectBtn.disabled = true;
             }
 
             try {
+                // Setup wallet event listeners if ethereum is available
                 if (typeof window.ethereum !== 'undefined') {
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-
-                    // Check if already connected
-                    const accounts = await provider.listAccounts();
-                    if (accounts.length > 0) {
-                        await connectWallet();
-                    }
+                    console.log('Wallet detected:', window.ethereum.isMetaMask ? 'MetaMask' : 'Other');
 
                     // Listen for account changes
-                    window.ethereum.on('accountsChanged', (accounts) => {
-                        if (accounts.length > 0) {
-                            connectWallet();
-                        } else {
-                            disconnectWallet();
-                        }
-                    });
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    window.ethereum.on('chainChanged', handleChainChanged);
 
-                    window.ethereum.on('chainChanged', () => {
-                        window.location.reload();
-                    });
+                    // Check if already connected
+                    try {
+                        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                        if (accounts && accounts.length > 0) {
+                            console.log('Found existing connection, reconnecting...');
+                            await connectWallet(true); // Silent connect
+                        }
+                    } catch (e) {
+                        console.warn('Could not check existing accounts:', e.message);
+                    }
+                } else {
+                    console.log('No wallet detected - read-only mode');
                 }
 
                 // Load read-only data
                 await loadPublicData();
+
             } catch (error) {
                 console.error('Initialization error:', error);
+                showGlobalError('Failed to initialize: ' + error.message);
+            } finally {
+                // Re-enable connect button
+                if (connectBtn) {
+                    connectBtn.textContent = 'Connect Wallet';
+                    connectBtn.disabled = false;
+                }
             }
         }
 
-        async function connectWallet() {
+        function handleAccountsChanged(accounts) {
+            console.log('Accounts changed:', accounts);
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else if (accounts[0] !== userAddress) {
+                connectWallet(true);
+            }
+        }
+
+        function handleChainChanged(chainId) {
+            console.log('Chain changed to:', chainId);
+            window.location.reload();
+        }
+
+        function showGlobalError(message) {
+            const container = document.querySelector('.container');
+            if (container) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'status error';
+                errorDiv.style.marginBottom = '20px';
+                errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+                container.insertBefore(errorDiv, container.firstChild);
+            }
+        }
+
+        async function connectWallet(silent = false) {
+            if (isConnecting) {
+                console.log('Connection already in progress');
+                return;
+            }
+
+            const connectBtn = document.getElementById('connectBtn');
+
             try {
+                isConnecting = true;
+
+                // Check for wallet
                 if (typeof window.ethereum === 'undefined') {
-                    alert('Please install MetaMask!');
+                    if (!silent) {
+                        alert('No Web3 wallet detected!\n\nPlease install MetaMask or another Web3 wallet to use this app.\n\nVisit: https://metamask.io');
+                    }
                     return;
                 }
 
-                await window.ethereum.request({ method: 'eth_requestAccounts' });
-                provider = new ethers.providers.Web3Provider(window.ethereum);
+                // Update button state
+                if (connectBtn) {
+                    connectBtn.textContent = 'Connecting...';
+                    connectBtn.disabled = true;
+                }
+
+                // Request account access
+                console.log('Requesting account access...');
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+                if (!accounts || accounts.length === 0) {
+                    throw new Error('No accounts returned from wallet');
+                }
+
+                // Create Web3 provider
+                provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
                 signer = provider.getSigner();
                 userAddress = await signer.getAddress();
+                console.log('Connected to wallet:', userAddress);
 
-                // Check network
+                // Check network and switch if needed
                 const network = await provider.getNetwork();
-                if (network.chainId !== 8453) {
+                console.log('Current network:', network.chainId, network.name);
+
+                if (network.chainId !== BASE_CHAIN_ID) {
+                    console.log('Wrong network, switching to Base...');
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0x2105' }]
+                            params: [{ chainId: BASE_CHAIN_HEX }]
                         });
+                        // Refresh provider after chain switch
+                        provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+                        signer = provider.getSigner();
                     } catch (switchError) {
+                        // Chain not added to wallet
                         if (switchError.code === 4902) {
+                            console.log('Adding Base network to wallet...');
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
                                 params: [{
-                                    chainId: '0x2105',
+                                    chainId: BASE_CHAIN_HEX,
                                     chainName: 'Base',
-                                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                                    rpcUrls: ['https://mainnet.base.org'],
+                                    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+                                    rpcUrls: ['https://mainnet.base.org', 'https://base.llamarpc.com'],
                                     blockExplorerUrls: ['https://basescan.org']
                                 }]
                             });
+                            // Refresh provider after adding chain
+                            provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+                            signer = provider.getSigner();
+                        } else if (switchError.code === 4001) {
+                            throw new Error('Please switch to Base network to use this app');
+                        } else {
+                            throw switchError;
                         }
                     }
                 }
@@ -929,7 +1072,7 @@
                 // Initialize contracts with signer
                 initContracts(signer);
 
-                // Update UI
+                // Update UI to show connected state
                 document.getElementById('walletSection').innerHTML = `
                     <div class="wallet-info">
                         <span class="network-badge">Base</span>
@@ -938,20 +1081,45 @@
                     </div>
                 `;
 
+                // Load user-specific data
                 await loadUserData();
+                console.log('Wallet connection complete');
 
             } catch (error) {
                 console.error('Connection error:', error);
-                alert('Connection failed: ' + (error.message || 'Unknown error'));
+
+                // Reset button state
+                if (connectBtn) {
+                    connectBtn.textContent = 'Connect Wallet';
+                    connectBtn.disabled = false;
+                }
+
+                // User-friendly error messages
+                let errorMessage = error.message || 'Unknown error';
+                if (error.code === 4001) {
+                    errorMessage = 'Connection rejected. Please approve the connection request in your wallet.';
+                } else if (error.code === -32002) {
+                    errorMessage = 'Please check your wallet - there may be a pending connection request.';
+                }
+
+                if (!silent) {
+                    alert('Connection failed: ' + errorMessage);
+                }
+            } finally {
+                isConnecting = false;
             }
         }
 
         function disconnectWallet() {
+            console.log('Disconnecting wallet...');
             userAddress = null;
             signer = null;
+            provider = null;
             document.getElementById('walletSection').innerHTML = `
                 <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
             `;
+            // Reload public data with read-only provider
+            loadPublicData();
         }
 
         function initContracts(signerOrProvider) {
@@ -965,33 +1133,12 @@
         }
 
         async function loadPublicData() {
+            console.log('Loading public data...');
             try {
-                // Use wallet provider if connected, otherwise use public RPC
-                // Base has multiple public RPCs - try them in order
-                const rpcUrls = [
-                    'https://base.llamarpc.com',
-                    'https://base.meowrpc.com',
-                    'https://base-mainnet.public.blastapi.io',
-                    'https://mainnet.base.org'
-                ];
-
+                // Use wallet provider if connected, otherwise use read-only RPC
                 let publicProvider = provider;
                 if (!publicProvider) {
-                    // Try to find a working RPC
-                    for (const rpc of rpcUrls) {
-                        try {
-                            publicProvider = new ethers.providers.JsonRpcProvider(rpc);
-                            await publicProvider.getBlockNumber(); // Test connection
-                            break;
-                        } catch (e) {
-                            console.warn('RPC failed:', rpc);
-                            publicProvider = null;
-                        }
-                    }
-                    if (!publicProvider) {
-                        console.error('All RPCs failed');
-                        return;
-                    }
+                    publicProvider = await getReadOnlyProvider();
                 }
                 initContracts(publicProvider);
 
@@ -1055,13 +1202,31 @@
                 const tgeTime = await contracts.vesting.tgeTime();
                 document.getElementById('tgeTime').textContent = new Date(tgeTime.toNumber() * 1000).toLocaleDateString();
 
+                console.log('Public data loaded successfully');
+
             } catch (error) {
                 console.error('Error loading public data:', error);
+                // Show error to user
+                const dashboardDiv = document.getElementById('dashboard');
+                if (dashboardDiv) {
+                    const errorNotice = document.createElement('div');
+                    errorNotice.className = 'status error';
+                    errorNotice.style.marginBottom = '20px';
+                    errorNotice.innerHTML = `<strong>Error loading data:</strong> ${error.message}. <button onclick="loadPublicData()" class="btn btn-primary" style="padding: 5px 15px; margin-left: 10px;">Retry</button>`;
+                    const existingError = dashboardDiv.querySelector('.status.error');
+                    if (existingError) existingError.remove();
+                    dashboardDiv.insertBefore(errorNotice, dashboardDiv.firstChild);
+                }
             }
         }
 
         async function loadUserData() {
-            if (!userAddress) return;
+            if (!userAddress) {
+                console.log('No user address, skipping user data load');
+                return;
+            }
+
+            console.log('Loading user data for:', userAddress);
 
             try {
                 // DMD balance
@@ -1085,8 +1250,32 @@
                     for (const posId of positions) {
                         const pos = await contracts.vault.getPosition(userAddress, posId);
                         const isUnlocked = await contracts.vault.isUnlocked(userAddress, posId);
+
+                        // Check early unlock status
+                        let earlyUnlockStatus = null;
+                        try {
+                            earlyUnlockStatus = await contracts.vault.getEarlyUnlockStatus(userAddress, posId);
+                        } catch (e) {
+                            // Function might not exist on older deployments
+                        }
+
                         totalTBTC = totalTBTC.add(pos.amount);
                         totalWeight = totalWeight.add(pos.weight);
+
+                        let statusHtml;
+                        if (isUnlocked) {
+                            statusHtml = '<span style="color: var(--success);">Unlocked</span>';
+                        } else if (earlyUnlockStatus && earlyUnlockStatus.requested) {
+                            if (earlyUnlockStatus.isReady) {
+                                statusHtml = '<span style="color: var(--success);">Early Unlock Ready</span>';
+                            } else {
+                                const readyDate = new Date(earlyUnlockStatus.readyTime.toNumber() * 1000);
+                                statusHtml = `<span style="color: var(--secondary);">Unlocking ${readyDate.toLocaleDateString()}</span>`;
+                            }
+                        } else {
+                            const unlockDate = new Date(pos.unlockTime.toNumber() * 1000);
+                            statusHtml = `<span style="color: var(--text-muted);">Locked until ${unlockDate.toLocaleDateString()}</span>`;
+                        }
 
                         const row = document.createElement('tr');
                         row.innerHTML = `
@@ -1094,7 +1283,7 @@
                             <td>${formatBTC(pos.amount)}</td>
                             <td>${pos.lockMonths}m</td>
                             <td>${formatNumber(pos.weight)}</td>
-                            <td>${isUnlocked ? '<span style="color: var(--success);">Unlocked</span>' : '<span style="color: var(--secondary);">Locked</span>'}</td>
+                            <td>${statusHtml}</td>
                         `;
                         positionsList.appendChild(row);
                     }
@@ -1107,18 +1296,29 @@
                 document.getElementById('userVestedWeight').textContent = formatNumber(userVestedWeight);
 
                 // Vesting info
-                const vestingInfo = await contracts.vesting.getBeneficiary(userAddress);
-                document.getElementById('vestingAllocation').textContent = formatNumber(vestingInfo.total);
-                document.getElementById('vestedAmount').textContent = formatNumber(vestingInfo.vested);
-                document.getElementById('alreadyClaimed').textContent = formatNumber(vestingInfo.claimed);
-                document.getElementById('vestingClaimable').textContent = formatNumber(vestingInfo.claimable);
+                try {
+                    const vestingInfo = await contracts.vesting.getBeneficiary(userAddress);
+                    document.getElementById('vestingAllocation').textContent = formatNumber(vestingInfo.total);
+                    document.getElementById('vestedAmount').textContent = formatNumber(vestingInfo.vested);
+                    document.getElementById('alreadyClaimed').textContent = formatNumber(vestingInfo.claimed);
+                    document.getElementById('vestingClaimable').textContent = formatNumber(vestingInfo.claimable);
+                } catch (e) {
+                    // User is not a beneficiary
+                    document.getElementById('vestingAllocation').textContent = '0';
+                    document.getElementById('vestedAmount').textContent = '0';
+                    document.getElementById('alreadyClaimed').textContent = '0';
+                    document.getElementById('vestingClaimable').textContent = '0';
+                }
 
                 // Redemption stats
                 const userTotalBurned = await contracts.redemption.totalBurnedByUser(userAddress);
                 document.getElementById('userTotalBurned').textContent = formatNumber(userTotalBurned);
 
+                console.log('User data loaded successfully');
+
             } catch (error) {
                 console.error('Error loading user data:', error);
+                showStatus('lockStatus', 'error', 'Error loading user data: ' + error.message);
             }
         }
 
@@ -1194,18 +1394,79 @@
             }
         }
 
-        async function earlyUnlock() {
+        async function checkEarlyUnlockStatus() {
+            const posId = document.getElementById('unlockPositionId').value;
+            const infoDiv = document.getElementById('earlyUnlockInfo');
+            const statusText = document.getElementById('earlyUnlockStatusText');
+
+            if (!posId || !userAddress || !contracts.vault) {
+                infoDiv.style.display = 'none';
+                return;
+            }
+
+            try {
+                const status = await contracts.vault.getEarlyUnlockStatus(userAddress, posId);
+                infoDiv.style.display = 'block';
+
+                if (!status.requested) {
+                    statusText.innerHTML = '<span style="color: var(--text-muted);">No early unlock requested</span>';
+                } else if (status.isReady) {
+                    statusText.innerHTML = '<span style="color: var(--success);">Ready to redeem!</span>';
+                } else {
+                    const readyDate = new Date(status.readyTime.toNumber() * 1000);
+                    const now = new Date();
+                    const daysLeft = Math.ceil((readyDate - now) / (1000 * 60 * 60 * 24));
+                    statusText.innerHTML = `<span style="color: var(--secondary);">Unlocks ${readyDate.toLocaleDateString()} (${daysLeft} days left)</span>`;
+                }
+            } catch (error) {
+                infoDiv.style.display = 'none';
+                console.error('Error checking early unlock status:', error);
+            }
+        }
+
+        async function requestEarlyUnlock() {
             try {
                 const posId = document.getElementById('unlockPositionId').value;
                 if (posId === '') return alert('Enter position ID');
 
-                showStatus('unlockStatus', 'info', 'Requesting early unlock (30-day delay)...');
+                showStatus('unlockStatus', 'info', 'Requesting early unlock (30-day waiting period)...');
                 const tx = await contracts.vault.requestEarlyUnlock(posId);
                 await tx.wait();
-                showStatus('unlockStatus', 'success', 'Early unlock requested! Position will be unlockable in 30 days.');
+                showStatus('unlockStatus', 'success', 'Early unlock requested! Position will be redeemable in 30 days. Your weight has been removed.');
                 await loadUserData();
+                await checkEarlyUnlockStatus();
             } catch (error) {
-                showStatus('unlockStatus', 'error', error.message);
+                let errorMsg = error.message;
+                if (error.message.includes('AlreadyRequestedEarlyUnlock')) {
+                    errorMsg = 'Early unlock already requested for this position';
+                } else if (error.message.includes('PositionNotFound')) {
+                    errorMsg = 'Position not found';
+                } else if (error.message.includes('PositionLocked')) {
+                    errorMsg = 'Position is already unlocked (no early unlock needed)';
+                }
+                showStatus('unlockStatus', 'error', errorMsg);
+            }
+        }
+
+        async function cancelEarlyUnlock() {
+            try {
+                const posId = document.getElementById('unlockPositionId').value;
+                if (posId === '') return alert('Enter position ID');
+
+                showStatus('unlockStatus', 'info', 'Cancelling early unlock request...');
+                const tx = await contracts.vault.cancelEarlyUnlock(posId);
+                await tx.wait();
+                showStatus('unlockStatus', 'success', 'Early unlock cancelled! Your weight has been restored.');
+                await loadUserData();
+                await checkEarlyUnlockStatus();
+            } catch (error) {
+                let errorMsg = error.message;
+                if (error.message.includes('NoEarlyUnlockRequested')) {
+                    errorMsg = 'No early unlock request to cancel';
+                } else if (error.message.includes('PositionNotFound')) {
+                    errorMsg = 'Position not found';
+                }
+                showStatus('unlockStatus', 'error', errorMsg);
             }
         }
 
