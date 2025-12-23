@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-/// @title EmissionScheduler - Year-based DMD emissions with 18% annual decay
+/// @title EmissionScheduler - Year-based DMD emissions with 25% annual decay
 /// @dev Fully decentralized, 14.4M cap, auto-starts at deployment
 contract EmissionScheduler {
     error Unauthorized();
