@@ -158,6 +158,25 @@ dmdToken.approve(redemption, requiredBurn);
 redemption.redeem(positionId);
 ```
 
+### 5. Early Unlock (Optional)
+
+Users can exit early with 30-day waiting period:
+
+```solidity
+// Request early unlock (weight removed immediately, stops earning)
+vault.requestEarlyUnlock(positionId);
+
+// Check status
+(bool requested, uint256 readyTime, bool isReady) = vault.getEarlyUnlockStatus(user, positionId);
+
+// Cancel if changed mind (restores weight)
+vault.cancelEarlyUnlock(positionId);
+
+// After 30 days, redeem (must burn all earned DMD)
+dmdToken.approve(redemption, requiredBurn);
+redemption.redeem(positionId);
+```
+
 ## Security Notes
 
 - **No admin functions** - Protocol is fully immutable
@@ -165,6 +184,7 @@ redemption.redeem(positionId);
 - **No pause** - Cannot be stopped once deployed
 - **Burn-to-redeem** - Must burn ALL DMD earned from position
 - **Flash loan protected** - 7-day warmup + 3-day vesting
+- **Early unlock** - 30-day waiting period, weight removed immediately
 - **Audited** - 100/100 security score
 
 ## Important Reminders

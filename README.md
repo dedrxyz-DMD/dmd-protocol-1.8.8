@@ -90,8 +90,17 @@ To unlock tBTC from a given position:
 Properties:
 - No partial burns
 - No substitution with externally acquired DMD
-- No early unlocks
 - No governance exceptions
+
+### Early Unlock Option
+
+Users can request early unlock before lock period expires:
+
+1. Call `requestEarlyUnlock(positionId)` — weight removed immediately
+2. Wait 30 days
+3. Call `redeem(positionId)` — burn all earned DMD, get tBTC back
+
+Can cancel anytime with `cancelEarlyUnlock(positionId)` to restore weight.
 
 ---
 

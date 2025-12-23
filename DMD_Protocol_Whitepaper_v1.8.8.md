@@ -210,9 +210,20 @@ To unlock tBTC from a given position:
 Properties:
 - No partial redemption
 - No substitution with externally acquired DMD
-- No early unlocks
 
-### 7.2 Market-Driven Deflation
+### 7.2 Early Unlock Option
+
+Users may request early unlock before the lock period expires:
+
+- **Request**: Call `requestEarlyUnlock(positionId)`
+- **Waiting Period**: 30 days from request
+- **Weight Removal**: Immediate (stops earning DMD rewards)
+- **Cancellation**: Can cancel anytime before redemption to restore weight
+- **Redemption**: After 30 days, burn all earned DMD to unlock tBTC
+
+This provides user flexibility while maintaining protocol security.
+
+### 7.3 Market-Driven Deflation
 
 - Market stress → more redemptions → accelerated burns
 - Market optimism → fewer redemptions → supply freeze
@@ -243,11 +254,12 @@ Human behavior becomes the **scarcity engine**.
 ## 9. TECHNICAL SPECIFICATION
 
 - **Chain**: Base (Chain ID 8453)
-- **Reserve Asset**: tBTC  
+- **Reserve Asset**: tBTC
   `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
 - **Epoch Length**: 7 days
 - **Max Weight Multiplier**: 1.48× (24 months)
-- **Weight Vesting**: 10 days
+- **Weight Vesting**: 10 days (7-day warmup + 3-day linear)
+- **Early Unlock Delay**: 30 days
 
 ---
 
@@ -266,10 +278,10 @@ Security rating: **A+**
 ## 11. RISKS & DISCLOSURES
 
 - Immutability means no fixes post-deployment
-- Locked tBTC cannot exit early
+- Early unlock requires 30-day waiting period (weight removed immediately)
 - DMD liquidity depends on adoption
 - Users must self-custody private keys
-- Protocol provided “as is”
+- Protocol provided "as is"
 
 This document is not financial advice.
 
