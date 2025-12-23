@@ -7,13 +7,13 @@ import "./interfaces/IMintDistributor.sol";
 
 /// @title RedemptionEngine - Burns DMD to unlock tBTC from vault
 /// @dev User must burn ALL DMD minted from position to redeem tBTC
+/// @dev If user never claimed DMD, they can redeem without burning
 contract RedemptionEngine {
     error InsufficientDMD();
     error PositionLocked();
     error PositionNotFound();
     error AlreadyRedeemed();
     error InvalidAmount();
-    error NoDMDMinted();
 
     IDMDToken public immutable dmdToken;
     IBTCReserveVault public immutable vault;
@@ -32,6 +32,7 @@ contract RedemptionEngine {
     }
 
     /// @notice Redeem tBTC by burning ALL DMD minted from position
+    /// @dev If no DMD was minted (user never claimed), redemption is free
     /// @param positionId Position ID to redeem
     function redeem(uint256 positionId) external {
         if (redeemed[msg.sender][positionId]) revert AlreadyRedeemed();
@@ -41,24 +42,28 @@ contract RedemptionEngine {
         if (!vault.isUnlocked(msg.sender, positionId)) revert PositionLocked();
 
         uint256 requiredBurn = mintDistributor.getPositionDMDMinted(msg.sender, positionId);
-        if (requiredBurn == 0) revert NoDMDMinted();
 
         redeemed[msg.sender][positionId] = true;
-        totalBurnedByUser[msg.sender] += requiredBurn;
 
-        dmdToken.transferFrom(msg.sender, address(this), requiredBurn);
-        dmdToken.burn(requiredBurn);
+        // Only burn if DMD was minted to this position
+        if (requiredBurn > 0) {
+            totalBurnedByUser[msg.sender] += requiredBurn;
+            dmdToken.transferFrom(msg.sender, address(this), requiredBurn);
+            dmdToken.burn(requiredBurn);
+        }
+
         vault.redeem(msg.sender, positionId);
-
         emit Redeemed(msg.sender, positionId, tbtcAmount, requiredBurn);
     }
 
     /// @notice Redeem multiple positions by burning ALL DMD minted from each
+    /// @dev Positions with no DMD minted can still be redeemed (free redemption)
     /// @param positionIds Array of position IDs to redeem
     function redeemMultiple(uint256[] calldata positionIds) external {
         uint256 len = positionIds.length;
         uint256 totalBurn = 0;
         uint256[] memory burns = new uint256[](len);
+        bool[] memory shouldRedeem = new bool[](len);
 
         // Calculate total burn and mark as redeemed
         for (uint256 i = 0; i < len;) {
@@ -75,18 +80,15 @@ contract RedemptionEngine {
             }
 
             uint256 requiredBurn = mintDistributor.getPositionDMDMinted(msg.sender, posId);
-            if (requiredBurn == 0) {
-                unchecked { ++i; }
-                continue;
-            }
 
             redeemed[msg.sender][posId] = true;
+            shouldRedeem[i] = true;
             burns[i] = requiredBurn;
             totalBurn += requiredBurn;
             unchecked { ++i; }
         }
 
-        // Burn all DMD at once
+        // Burn all DMD at once (if any)
         if (totalBurn > 0) {
             totalBurnedByUser[msg.sender] += totalBurn;
             dmdToken.transferFrom(msg.sender, address(this), totalBurn);
@@ -95,7 +97,7 @@ contract RedemptionEngine {
 
         // Redeem positions and emit events
         for (uint256 i = 0; i < len;) {
-            if (burns[i] == 0) {
+            if (!shouldRedeem[i]) {
                 unchecked { ++i; }
                 continue;
             }
@@ -132,6 +134,7 @@ contract RedemptionEngine {
         if (tbtcAmount == 0 || !vault.isUnlocked(user, positionId)) return false;
 
         uint256 requiredBurn = mintDistributor.getPositionDMDMinted(user, positionId);
-        return requiredBurn > 0 && dmdToken.balanceOf(user) >= requiredBurn;
+        // Can redeem if no DMD minted OR if user has enough DMD to burn
+        return requiredBurn == 0 || dmdToken.balanceOf(user) >= requiredBurn;
     }
 }

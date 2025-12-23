@@ -82,6 +82,10 @@ contract BTCReserveVault {
     uint256 public totalLocked;
     /// @notice Total raw system weight
     uint256 public totalSystemWeight;
+    /// @notice Cached total vested weight (updated via updateVestedWeightCache)
+    uint256 public cachedTotalVestedWeight;
+    /// @notice Last update timestamp for cached weight
+    uint256 public lastWeightCacheUpdate;
 
     /// @notice All users who have ever locked
     address[] public allUsers;
@@ -98,6 +102,8 @@ contract BTCReserveVault {
     event Locked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockMonths, uint256 weight);
     /// @notice Emitted when tBTC is redeemed
     event Redeemed(address indexed user, uint256 indexed positionId, uint256 amount);
+    /// @notice Emitted when vested weight cache is updated
+    event WeightCacheUpdated(uint256 totalVestedWeight, uint256 usersProcessed, uint256 timestamp);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -211,13 +217,59 @@ contract BTCReserveVault {
         return total;
     }
 
-    /// @notice Get total vested weight across ALL users
-    /// @dev Used for epoch snapshots. Gas scales with O(users × positions)
+    /// @notice Get total vested weight across ALL users (uses cache if fresh)
+    /// @dev Returns cached value if updated within last hour, otherwise calculates
     /// @return Total system vested weight
     function getTotalVestedWeight() external view returns (uint256) {
-        uint256 total = 0;
+        // Use cache if updated within last hour
+        if (block.timestamp - lastWeightCacheUpdate < 1 hours && cachedTotalVestedWeight > 0) {
+            return cachedTotalVestedWeight;
+        }
+        // Fallback to calculation (may fail at scale)
+        return _calculateTotalVestedWeight(0, allUsers.length);
+    }
+
+    /// @notice Update the cached total vested weight (paginated for gas efficiency)
+    /// @dev Call with startIndex=0, maxUsers=100 repeatedly until all users processed
+    /// @param startIndex Starting user index
+    /// @param maxUsers Maximum users to process in this call
+    /// @return processedCount Number of users processed
+    /// @return isComplete True if all users have been processed
+    function updateVestedWeightCache(uint256 startIndex, uint256 maxUsers) external returns (uint256 processedCount, bool isComplete) {
         uint256 userLen = allUsers.length;
-        for (uint256 i = 0; i < userLen;) {
+        if (startIndex >= userLen) {
+            return (0, true);
+        }
+
+        uint256 endIndex = startIndex + maxUsers;
+        if (endIndex > userLen) {
+            endIndex = userLen;
+        }
+
+        uint256 batchWeight = _calculateTotalVestedWeight(startIndex, endIndex);
+        processedCount = endIndex - startIndex;
+        isComplete = (endIndex >= userLen);
+
+        if (startIndex == 0) {
+            // First batch - reset cache
+            cachedTotalVestedWeight = batchWeight;
+        } else {
+            // Subsequent batch - add to cache
+            cachedTotalVestedWeight += batchWeight;
+        }
+
+        if (isComplete) {
+            lastWeightCacheUpdate = block.timestamp;
+            emit WeightCacheUpdated(cachedTotalVestedWeight, userLen, block.timestamp);
+        }
+
+        return (processedCount, isComplete);
+    }
+
+    /// @notice Internal function to calculate vested weight for a range of users
+    function _calculateTotalVestedWeight(uint256 startIndex, uint256 endIndex) internal view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = startIndex; i < endIndex;) {
             address user = allUsers[i];
             uint256[] memory active = activePositions[user];
             uint256 posLen = active.length;

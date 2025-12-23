@@ -16,4 +16,7 @@ interface IBTCReserveVault {
     function getActivePositionCount(address user) external view returns (uint256);
     function getActivePositions(address user) external view returns (uint256[] memory);
     function getTotalUsers() external view returns (uint256);
+    function updateVestedWeightCache(uint256 startIndex, uint256 maxUsers) external returns (uint256, bool);
+    function cachedTotalVestedWeight() external view returns (uint256);
+    function lastWeightCacheUpdate() external view returns (uint256);
 }
