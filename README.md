@@ -79,6 +79,8 @@ All non-emission allocations follow the **Diamond Vesting Curve** (5% TGE + 95% 
 
 **tBTC (Base Mainnet)**: `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
 **DMD token (Base Mainnet)**: `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
+
+
 ---
 
 ## Redemption Rule (Critical)
