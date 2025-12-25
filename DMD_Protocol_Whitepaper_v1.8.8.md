@@ -205,11 +205,9 @@ Emissions permanently stop when **14.4M DMD** is minted.
 
 To unlock tBTC from a given position:
 
-> **The user must burn 100% of all DMD minted from that specific locked position.**
+> **The user must burn the entire amount of DMD minted from that specific locked position.**
 
-Properties:
-- No partial redemption
-- No substitution with externally acquired DMD
+No partial redemption
 
 ### 7.2 Early Unlock Option
 
@@ -256,6 +254,8 @@ Human behavior becomes the **scarcity engine**.
 - **Chain**: Base (Chain ID 8453)
 - **Reserve Asset**: tBTC
   `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
+- **DMD Token**: DMD
+  `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
 - **Epoch Length**: 7 days
 - **Max Weight Multiplier**: 1.48× (24 months)
 - **Weight Vesting**: 10 days (7-day warmup + 3-day linear)
@@ -275,19 +275,7 @@ Security rating: **A+**
 
 ---
 
-## 11. RISKS & DISCLOSURES
-
-- Immutability means no fixes post-deployment
-- Early unlock requires 30-day waiting period (weight removed immediately)
-- DMD liquidity depends on adoption
-- Users must self-custody private keys
-- Protocol provided "as is"
-
-This document is not financial advice.
-
----
-
-## 12. ROADMAP
+## 11. ROADMAP
 
 - ✅ Architecture finalized
 - ✅ EDAD patent filed
@@ -301,7 +289,7 @@ No protocol upgrades planned.
 
 ---
 
-## 13. CONCLUSION
+## 12. CONCLUSION
 
 DMD Protocol introduces a new monetary primitive:
 
@@ -318,7 +306,7 @@ This is **programmable scarcity**.
 
 ---
 
-## 14. INTELLECTUAL PROPERTY NOTICE
+## 13. INTELLECTUAL PROPERTY NOTICE
 
 The **Extreme Deflationary Digital Asset Mechanism (EDAD)** implemented by DMD Protocol is the subject of a pending U.S. patent application.
 
