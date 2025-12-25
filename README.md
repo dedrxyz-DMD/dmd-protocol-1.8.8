@@ -92,7 +92,6 @@ To unlock tBTC from a given position:
 
 Properties:
 - No partial burns
-- No substitution with externally acquired DMD
 - No governance exceptions
 
 ### Early Unlock Option
