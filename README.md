@@ -2,9 +2,9 @@
 
 > Immutable Bitcoin Liquidity & Emission Protocol on Base
 
-**Status**: Production Ready  \
-**Network**: Base Mainnet  \
-**Reserve Asset**: tBTC (Threshold Network Bitcoin)  \
+**Status**: Production Ready  
+**Network**: Base Mainnet  
+**Reserve Asset**: tBTC (Threshold Network Bitcoin)  
 **Tests**: 160/160 passing (100%)
 
 ---
@@ -28,7 +28,7 @@ There are **no upgrades, no admin keys, no governance, and no emergency controls
 
 - **Reserve-Locked Minting**: DMD is minted only via tBTC locking
 - **Fixed Emissions**: Annual emissions decay by 25%, independent of deposits
-- **Mandatory Full Burn-to- Redeem**: No partial unlocks, no alternative exits
+- **Mandatory Full Burn-to-Redeem**: No partial unlocks, no alternative exits
 - **Market-Driven Deflation**: User redemption behavior determines supply collapse
 - **Permanent Supply Reduction**: Burned DMD can never be reminted
 
@@ -77,10 +77,21 @@ All non-emission allocations follow the **Diamond Vesting Curve** (5% TGE + 95% 
 - **DMDToken.sol** — ERC-20 with capped supply and public burn
 - **VestingContract.sol** — Long-term team & contributor vesting
 
-**tBTC (Base Mainnet)**: `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
+---
 
-**DMD token (Base Mainnet)**: `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
+## Deployed Contracts (Base Mainnet)
 
+| Contract | Address |
+|----------|---------|
+| **DMD Token** | `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC` |
+| **BTC Reserve Vault** | `0x06e0cd192d613636562629c1fb3536bC7271c829` |
+| **Emission Scheduler** | `0x68e0dc98221c432C41E2713937c113A3F8A345C5` |
+| **Mint Distributor** | `0xD982570b4203AcB76FEEcA49DC2fc484d20a1F00` |
+| **Redemption Engine** | `0xD4601b3c872bBd2DF761beAA4b96d4bE0A1565c4` |
+| **Vesting Contract** | `0x0055D2058797dcF0f83bB29815DB5f8C175f4f46` |
+| **tBTC (External)** | `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b` |
+
+All contracts are verified on **BaseScan** and fully immutable (no upgrades, no admin keys).
 
 ---
 
@@ -159,6 +170,5 @@ Open-source code remains freely usable; the underlying economic mechanism is pro
 
 ---
 
-**DMD Protocol v1.8.8**  \
+**DMD Protocol v1.8.8**  
 Immutable • Bitcoin-backed • Structurally Deflationary
-
