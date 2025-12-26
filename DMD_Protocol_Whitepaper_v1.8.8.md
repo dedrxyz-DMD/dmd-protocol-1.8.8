@@ -170,8 +170,9 @@ Real circulating supply is **always ≤ 14.4M** and may decrease indefinitely.
 | Contributors | 2.5% | 450,000 | Diamond Vesting Curve |
 | **Total** | **100%** | **18,000,000** | |
 
-All non-emission allocations follow the Diamond Vesting Curve (5% TGE + 95% linear over 7 years).
 ---
+
+All non-emission allocations follow the **Diamond Vesting Curve** (5% TGE + 95% linear over 7 years).
 
 ## 6. EMISSION MODEL
 
