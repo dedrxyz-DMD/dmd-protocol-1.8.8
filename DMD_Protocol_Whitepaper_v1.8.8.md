@@ -97,7 +97,7 @@ The **Extreme Deflationary Digital Asset Mechanism (EDAD)** is defined by five i
 2. **Fixed, Declining Emission Pool**  
    Emissions follow a deterministic decay schedule, independent of participation.
 
-3. **Mandatory Burn-to- Redeem**  
+3. **Mandatory Burn-to-Redeem**  
    Redemption of tBTC requires irreversible destruction of DMD.
 
 4. **Market-Behavior-Driven Deflation**  
@@ -207,7 +207,7 @@ To unlock tBTC from a given position:
 
 > **The user must burn the entire amount of DMD minted from that specific locked position.**
 
-No partial redemption
+No partial redemption.
 
 ### 7.2 Early Unlock Option
 
@@ -251,15 +251,27 @@ Human behavior becomes the **scarcity engine**.
 
 ## 9. TECHNICAL SPECIFICATION
 
-- **Chain**: Base (Chain ID 8453)
-- **Reserve Asset**: tBTC
-  `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
-- **DMD Token**: DMD
-  `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
+### 9.1 Network & Parameters
+
+- **Chain**: Base Mainnet (Chain ID 8453)
 - **Epoch Length**: 7 days
 - **Max Weight Multiplier**: 1.48× (24 months)
 - **Weight Vesting**: 10 days (7-day warmup + 3-day linear)
 - **Early Unlock Delay**: 30 days
+
+### 9.2 Deployed Contracts
+
+| Contract | Address |
+|----------|---------|
+| **DMD Token** | `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC` |
+| **BTC Reserve Vault** | `0x06e0cd192d613636562629c1fb3536bC7271c829` |
+| **Emission Scheduler** | `0x68e0dc98221c432C41E2713937c113A3F8A345C5` |
+| **Mint Distributor** | `0xD982570b4203AcB76FEEcA49DC2fc484d20a1F00` |
+| **Redemption Engine** | `0xD4601b3c872bBd2DF761beAA4b96d4bE0A1565c4` |
+| **Vesting Contract** | `0x0055D2058797dcF0f83bB29815DB5f8C175f4f46` |
+| **tBTC (External)** | `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b` |
+
+All contracts are **verified on BaseScan** and fully immutable.
 
 ---
 
@@ -280,7 +292,7 @@ Security rating: **A+**
 - ✅ Architecture finalized
 - ✅ EDAD patent filed
 - ✅ Testnet complete
-- 🎯 Base mainnet deployment
+- ✅ Base mainnet deployment
 - 🎯 Epoch 0 emissions
 - 🎯 Analytics dashboards
 - 🎯 Ecosystem integrations
