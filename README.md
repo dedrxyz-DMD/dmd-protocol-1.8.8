@@ -1,164 +1,320 @@
-# DMD Protocol v1.8.8 — EDAD / tBTC Only
+# 📘 DMD PROTOCOL WHITEPAPER
+## Version 1.8.8
+**Powered by the Extreme Deflationary Digital Asset Mechanism (EDAD)**
 
-> Immutable Bitcoin Liquidity & Emission Protocol on Base
-
-**Status**: Production Ready  \
-**Network**: Base Mainnet  \
-**Reserve Asset**: tBTC (Threshold Network Bitcoin)  \
-**Tests**: 160/160 passing (100%)
-
----
-
-## Overview
-
-DMD Protocol is a fully immutable, governance-free protocol that allows users to lock **tBTC** on Base to earn **DMD** emissions under the **Extreme Deflationary Digital Asset Mechanism (EDAD)**.
-
-The protocol enforces a strict **mint → burn → unlock** economic loop:
-
-- tBTC is locked to mint DMD
-- DMD is emitted from a fixed, declining supply schedule
-- To unlock tBTC, **100% of all DMD minted from that specific lock position must be burned**
-- Burned DMD is destroyed permanently
-
-There are **no upgrades, no admin keys, no governance, and no emergency controls**. Once deployed, the system operates autonomously forever.
+**Network**: Base Mainnet  
+**Reserve Asset**: tBTC (Threshold Network Bitcoin)  
+**Status**: Production Ready  
+**Date**: December 2025  
 
 ---
 
-## Core Properties (EDAD)
+## EXECUTIVE SUMMARY
 
-- **Reserve-Locked Minting**: DMD is minted only via tBTC locking
-- **Fixed Emissions**: Annual emissions decay by 25%, independent of deposits
-- **Mandatory Full Burn-to- Redeem**: No partial unlocks, no alternative exits
-- **Market-Driven Deflation**: User redemption behavior determines supply collapse
-- **Permanent Supply Reduction**: Burned DMD can never be reminted
+DMD Protocol is a decentralized, immutable Bitcoin liquidity and emission protocol deployed on Base. It implements the **Extreme Deflationary Digital Asset Mechanism (EDAD)** — a reserve-locked, emission-capped, mandatory burn-to-redeem economic system.
 
----
+Users lock **tBTC** to earn **DMD** from a fixed, declining emission schedule. To unlock their tBTC, users must **irreversibly burn 100% of all DMD minted from that specific locked position**, permanently reducing total circulating supply.
 
-## Key Features
+This creates a closed, one-way economic loop where **minting is conditional, burning is mandatory, and deflation is market-driven**.
 
-- **Single Asset Only**: tBTC on Base (no WBTC, no multi-asset logic)
-- **Strict Immutability**: No governance, no upgrades, no multisig
-- **Flash Loan Resistance**: 10-day weight vesting period
-- **Time-Weighted Participation**: Lock multipliers up to 1.48× (24 months)
-- **Deflationary Tokenomics**: 18M max supply, 14.4M emission cap
-- **Audit-Grade**: 160 comprehensive tests, all passing
+The protocol has:
+- No governance
+- No admin keys
+- No upgrades
+- No emergency controls
+
+Once deployed, DMD Protocol runs autonomously and permanently.
 
 ---
 
-## Tokenomics Summary
+## TABLE OF CONTENTS
 
-- **Maximum Supply**: 18,000,000 DMD (hard cap)
-- **Emission-Reachable Supply**: 14,400,000 DMD
-- **Real Circulating Supply**: Variable, permanently deflationary
-
-### Distribution Allocation
-
-| Allocation | % | Amount |
-|-----------|---|--------|
-| BTC Mining Emissions | 80% | 14,400,000 |
-| Foundation | 10% | 1,800,000 |
-| Founders | 5% | 900,000 |
-| Developers | 2.5% | 450,000 |
-| Contributors | 2.5% | 450,000 |
-| **Total** | **100%** | **18,000,000** |
-
-All non-emission allocations follow the **Diamond Vesting Curve** (5% TGE + 95% linear over 7 years).
+1. Introduction  
+2. Design Principles  
+3. The EDAD Mechanism  
+4. Protocol Architecture  
+5. Tokenomics  
+6. Emission Model  
+7. Redemption & Deflation  
+8. Security Model  
+9. Technical Specification  
+10. Audits & Testing  
+11. Risks & Disclosures  
+12. Roadmap  
+13. Conclusion  
+14. Intellectual Property Notice  
 
 ---
 
-## Architecture
+## 1. INTRODUCTION
 
-### Core Contracts
+### 1.1 Background
 
-- **BTCReserveVault.sol** — tBTC locking, positions, weight tracking
-- **EmissionScheduler.sol** — Fixed annual emissions with 25% decay
-- **MintDistributor.sol** — 7-day epoch-based distribution
-- **RedemptionEngine.sol** — Enforces full burn-to-redeem
-- **DMDToken.sol** — ERC-20 with capped supply and public burn
-- **VestingContract.sol** — Long-term team & contributor vesting
+Bitcoin is the most secure and scarce digital asset, yet remains largely idle in decentralized finance. Existing BTC-based protocols rely on custodians, inflationary incentives, governance-controlled emissions, or reversible supply mechanics.
 
-**tBTC (Base Mainnet)**: `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
+DMD Protocol introduces a structurally different model: **Bitcoin-backed scarcity enforced by code**, not discretion.
 
-**DMD token (Base Mainnet)**: `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
+### 1.2 Objectives
 
+DMD Protocol is designed to be:
+- Structurally deflationary
+- Governance-free
+- Whale-resistant
+- Fully immutable
+- Market-reactive
+- Audit-verifiable
 
 ---
 
-## Redemption Rule (Critical)
+## 2. DESIGN PRINCIPLES
+
+### 2.1 Single-Asset Simplicity
+
+DMD Protocol accepts **only tBTC**:
+- No WBTC
+- No synthetic derivatives
+- No multi-asset risk
+
+tBTC provides decentralized custody, threshold security, and Ethereum-native settlement on Base.
+
+### 2.2 Time-Weighted Commitment
+
+Users lock tBTC for fixed durations. Longer commitments receive higher weight multipliers, increasing emission share.
+
+Weight **vests over time**, preventing flash-loan or short-term manipulation.
+
+---
+
+## 3. THE EDAD MECHANISM
+
+### 3.1 Definition
+
+The **Extreme Deflationary Digital Asset Mechanism (EDAD)** is defined by five immutable properties:
+
+1. **Reserve-Locked Minting**  
+   DMD is minted exclusively through tBTC locking.
+
+2. **Fixed, Declining Emission Pool**  
+   Emissions follow a deterministic decay schedule, independent of participation.
+
+3. **Mandatory Burn-to- Redeem**  
+   Redemption of tBTC requires irreversible destruction of DMD.
+
+4. **Market-Behavior-Driven Deflation**  
+   User redemption behavior directly determines deflation rate.
+
+5. **Permanent Supply Reduction**  
+   Burned DMD is removed forever; supply may fall below all caps.
+
+### 3.2 Closed Economic Loop
+
+```
+Lock tBTC → Mint DMD → Burn DMD → Unlock tBTC
+```
+
+This loop is irreversible and cannot be bypassed.
+
+---
+
+## 4. PROTOCOL ARCHITECTURE
+
+### 4.1 Core Smart Contracts
+
+- **BTCReserveVault**  
+  Handles tBTC locking, position tracking, and emission accounting.
+
+- **EmissionScheduler**  
+  Controls fixed, decaying annual emissions.
+
+- **MintDistributor**  
+  Distributes weekly emissions proportionally by vested weight.
+
+- **RedemptionEngine**  
+  Enforces full burn-to-redeem logic.
+
+- **DMDToken (ERC-20)**  
+  Fixed-supply token with public burn functionality.
+
+- **VestingContract**  
+  Diamond Vesting Curve for non-emission allocations.
+
+### 4.2 Immutability Guarantees
+
+- No proxy contracts
+- No upgrade paths
+- No owner privileges post-deployment
+- All critical parameters hardcoded
+
+---
+
+## 5. TOKENOMICS
+
+### 5.1 Supply Overview
+
+| Category | Amount |
+|--------|--------|
+| Maximum Possible Supply | 18,000,000 DMD |
+| Emission-Reachable Supply | 14,400,000 DMD |
+| Real Circulating Supply | Variable, deflationary |
+
+Real circulating supply is **always ≤ 14.4M** and may decrease indefinitely.
+
+### 5.2 Distribution Allocation
+
+| Allocation | % | Amount | Vesting |
+|-----------|---|--------|--------|
+| BTC Mining Emissions | 80% | 14,400,000 | EDAD emissions |
+| Foundation | 10% | 1,800,000 | Diamond Vesting Curve |
+| Founders | 5% | 900,000 | Diamond Vesting Curve |
+| Developers | 2.5% | 450,000 | Diamond Vesting Curve |
+| Contributors | 2.5% | 450,000 | Diamond Vesting Curve |
+| **Total** | **100%** | **18,000,000** | |
+
+---
+
+## 6. EMISSION MODEL
+
+### 6.1 Annual Quartering Schedule
+
+Emissions decay by **25% annually**:
+
+| Year | Emission |
+|----|----------|
+| 1 | 3,600,000 |
+| 2 | 2,700,000 |
+| 3 | 2,025,000 |
+| 4 | 1,518,750 |
+| 5 | 1,139,062 |
+| 6 | 854,296 |
+| … | ×0.75 annually |
+
+Emissions permanently stop when **14.4M DMD** is minted.
+
+### 6.2 Epoch Distribution
+
+- 7-day epochs
+- Permissionless finalization
+- Proportional to **vested lock weight**
+- Oracle-free
+
+---
+
+## 7. REDEMPTION & DEFLATION
+
+### 7.1 Mandatory Full Burn Rule
 
 To unlock tBTC from a given position:
 
-> **The user must burn 100% of all DMD minted from that exact lock position.**
+> **The user must burn the entire amount of DMD minted from that specific locked position.**
 
-Properties:
-- No partial burns
-- No governance exceptions
+No partial redemption
 
-### Early Unlock Option
+### 7.2 Early Unlock Option
 
-Users can request early unlock before lock period expires:
+Users may request early unlock before the lock period expires:
 
-1. Call `requestEarlyUnlock(positionId)` — weight removed immediately
-2. Wait 30 days
-3. Call `redeem(positionId)` — burn all earned DMD, get tBTC back
+- **Request**: Call `requestEarlyUnlock(positionId)`
+- **Waiting Period**: 30 days from request
+- **Weight Removal**: Immediate (stops earning DMD rewards)
+- **Cancellation**: Can cancel anytime before redemption to restore weight
+- **Redemption**: After 30 days, burn all earned DMD to unlock tBTC
 
-Can cancel anytime with `cancelEarlyUnlock(positionId)` to restore weight.
+This provides user flexibility while maintaining protocol security.
 
----
+### 7.3 Market-Driven Deflation
 
-## Security Model
+- Market stress → more redemptions → accelerated burns
+- Market optimism → fewer redemptions → supply freeze
 
-### Flash Loan Protection
-
-- Days 0–7: 0% weight (epoch delay)
-- Days 7–10: Linear vesting (0% → 100%)
-- Day 10+: Full weight active
-
-### Additional Protections
-
-- CEI pattern enforced throughout
-- Solidity 0.8.x overflow safety
-- MAX_POSITIONS_PER_USER = 100
-- No oracles in core logic
+Human behavior becomes the **scarcity engine**.
 
 ---
 
-## Testing & Verification
+## 8. SECURITY MODEL
 
-- **Total Tests**: 160+
-- **Coverage**: 100% of critical paths
+### 8.1 Economic Security
+
+- Fixed emissions prevent inflation exploits
+- Full burn requirement prevents exit arbitrage
+- No governance removes manipulation vectors
+- Whale deposits do not increase total supply
+
+### 8.2 Technical Security
+
+- Solidity 0.8.x overflow protection
+- CEI pattern enforced
+- 10-day weight vesting
+- Position limits prevent gas DoS
+- No oracle dependencies in core logic
+
+---
+
+## 9. TECHNICAL SPECIFICATION
+
+- **Chain**: Base (Chain ID 8453)
+- **Reserve Asset**: tBTC
+  `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b`
+- **DMD Token**: DMD
+  `0xf93d0A59b6e77b092cb46D45387de318Cd6DBbdC`
+- **Epoch Length**: 7 days
+- **Max Weight Multiplier**: 1.48× (24 months)
+- **Weight Vesting**: 10 days (7-day warmup + 3-day linear)
+- **Early Unlock Delay**: 30 days
+
+---
+
+## 10. AUDITS & TESTING
+
+- 160+ automated tests
+- 100% critical-path coverage
 - Flash-loan attack simulations passed
 - Supply invariants verified
+- Full burn redemption logic tested
 
-Security posture: **A+**
-
----
-
-## Version Information
-
-- **Protocol Version**: 1.8.8
-- **Solidity**: ^0.8.20
-- **Network**: Base Mainnet
-- **Upgradeability**: None
+Security rating: **A+**
 
 ---
 
-## Documentation
+## 11. ROADMAP
 
-- 📘 Whitepaper: `DMD_Protocol_Whitepaper_v1.8.8.md`
-- 📂 Contracts: `/src`
-- 🧪 Tests: `/test`
+- ✅ Architecture finalized
+- ✅ EDAD patent filed
+- ✅ Testnet complete
+- 🎯 Base mainnet deployment
+- 🎯 Epoch 0 emissions
+- 🎯 Analytics dashboards
+- 🎯 Ecosystem integrations
 
----
-
-## Intellectual Property Notice
-
-The **Extreme Deflationary Digital Asset Mechanism (EDAD)** implemented by DMD Protocol is subject to a pending U.S. patent application.
-
-Open-source code remains freely usable; the underlying economic mechanism is protected against unauthorized commercial replication.
+No protocol upgrades planned.
 
 ---
 
-**DMD Protocol v1.8.8**  \
-Immutable • Bitcoin-backed • Structurally Deflationary
+## 12. CONCLUSION
 
+DMD Protocol introduces a new monetary primitive:
+
+- Bitcoin-backed
+- Structurally deflationary
+- Fully immutable
+- Market-reactive
+- Governance-free
+
+EDAD converts human behavior into an on-chain deflation engine.
+
+This is not yield farming.  
+This is **programmable scarcity**.
+
+---
+
+## 13. INTELLECTUAL PROPERTY NOTICE
+
+The **Extreme Deflationary Digital Asset Mechanism (EDAD)** implemented by DMD Protocol is the subject of a pending U.S. patent application.
+
+Open-source code remains freely usable; the economic mechanism is protected from unauthorized commercial replication.
+
+---
+
+**END OF WHITEPAPER**  
+**DMD Protocol v1.8.8**  
+**Base Mainnet**  
+**December 2025**
