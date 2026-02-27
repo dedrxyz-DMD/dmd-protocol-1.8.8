@@ -2,10 +2,10 @@
 ## Version 1.8.8
 **Powered by the Extreme Deflationary Digital Asset Mechanism (EDAD)**
 
-**Network**: Base Mainnet  
-**Reserve Asset**: tBTC (Threshold Network Bitcoin)  
-**Status**: Production Ready  
-**Date**: December 2025  
+**Network**: Base Mainnet
+**Reserve Asset**: tBTC (Threshold Network Bitcoin)
+**Status**: Production Ready
+**Date**: January 2026
 
 ---
 
@@ -44,7 +44,8 @@ Once deployed, DMD Protocol runs autonomously and permanently.
 12. Risks & Disclosures
 13. Roadmap
 14. Conclusion
-15. Intellectual Property Notice  
+15. Intellectual Property Notice
+16. Appendix: Version 1.8.8 Changes
 
 ---
 
@@ -93,19 +94,19 @@ Weight **vests over time**, preventing flash-loan or short-term manipulation.
 
 The **Extreme Deflationary Digital Asset Mechanism (EDAD)** is defined by five immutable properties:
 
-1. **Reserve-Locked Minting**  
+1. **Reserve-Locked Minting**
    DMD is minted exclusively through tBTC locking.
 
-2. **Fixed, Declining Emission Pool**  
+2. **Fixed, Declining Emission Pool**
    Emissions follow a deterministic decay schedule, independent of participation.
 
-3. **Mandatory Burn-to- Redeem**  
+3. **Mandatory Burn-to-Redeem**
    Redemption of tBTC requires irreversible destruction of DMD.
 
-4. **Market-Behavior-Driven Deflation**  
+4. **Market-Behavior-Driven Deflation**
    User redemption behavior directly determines deflation rate.
 
-5. **Permanent Supply Reduction**  
+5. **Permanent Supply Reduction**
    Burned DMD is removed forever; supply may fall below all caps.
 
 ### 3.2 Closed Economic Loop
@@ -132,7 +133,7 @@ This loop is irreversible and cannot be bypassed.
   Controls fixed, decaying annual emissions.
 
 - **MintDistributor**
-  Distributes weekly emissions proportionally by vested weight.
+  Distributes weekly emissions proportionally by vested weight. Supports single-transaction claiming with no snapshots required.
 
 - **RedemptionEngine**
   Enforces full burn-to-redeem logic.
@@ -201,6 +202,30 @@ Emissions permanently stop when **14.4M DMD** is minted.
 - Permissionless finalization
 - Proportional to **vested lock weight**
 - Oracle-free
+- **Single-transaction claims** — no snapshots required
+
+### 6.3 Zero-Weight Epoch Handling
+
+When an epoch has **zero total vested weight** (i.e., no users have completed the 10-day vesting period), the epoch is skipped and emissions for that period are **not distributed**.
+
+**Why This Happens:**
+- During protocol bootstrap, new locks must wait 7-day warmup + 3-day vesting before gaining weight
+- If all users are still in warmup, the epoch has zero eligible weight
+- Emissions cannot be distributed proportionally when the denominator is zero
+
+**Design Rationale:**
+- Emissions are rewards for **active participation**, not passive existence
+- Distributing to zero-weight epochs would require arbitrary allocation rules
+- Skipped emissions are not lost - they simply never enter circulation
+- This further reduces effective supply, aligning with the EDAD deflationary model
+
+**Practical Impact:**
+- Only affects the first 10 days after protocol launch (bootstrap period)
+- Once any user completes vesting, epochs proceed normally
+- Long-term impact is negligible (at most 1-2 epochs in protocol lifetime)
+
+This is **intentional behavior** that reinforces the principle: **no participation, no rewards**.
+
 
 ---
 
@@ -235,6 +260,25 @@ This provides user flexibility while maintaining protocol security.
 
 Human behavior becomes the **scarcity engine**.
 
+### 7.4 Micro-Deflation: Intentional Dust Reduction
+
+The weight calculation formula intentionally uses integer division:
+
+```
+weight = amount * (1000 + lockMonths * 20) / 1000
+```
+
+This division truncation causes negligible "dust" amounts (sub-wei fractions) to be lost in every weight calculation. While individually insignificant, this creates a **structural micro-deflation** effect across all protocol operations.
+
+**Design Rationale:**
+- Dust amounts are economically irrelevant at tBTC scale (1 BTC = 10^18 wei)
+- Accumulated truncation contributes to long-term supply reduction
+- Simpler math with no precision overhead
+- Aligns with the EDAD deflationary philosophy
+
+This is **intentional behavior**, not a bug.
+
+
 ---
 
 ## 8. PROTOCOL DEFENSE CONSENSUS (PDC)
@@ -261,12 +305,11 @@ The Protocol Defense Consensus (PDC) is a **minimal, adapter-only system** that 
 
 ### 8.2 Activation Conditions
 
-PDC is **completely inert** until ALL three conditions are met:
+PDC is **completely inert** until BOTH conditions are met:
 
 | Condition | Threshold | Rationale |
 |-----------|-----------|-----------|
-| Time Since Deployment | ≥ 3 years | Protocol stability proven |
-| Circulating Supply | ≥ 30% of MAX_SUPPLY | Sufficient distribution |
+| Circulating Supply | ≥ 30% of MAX_SUPPLY (5.4M DMD) | Sufficient distribution |
 | Unique Holders | ≥ 10,000 addresses | Decentralized ownership |
 
 Activation is:
@@ -362,7 +405,7 @@ The Foundation is temporary by design. As the public community becomes sufficien
 
 - Solidity 0.8.x overflow protection
 - CEI pattern enforced
-- 10-day weight vesting
+- 10-day weight vesting (provides flash loan protection without snapshots)
 - Position limits prevent gas DoS
 - No oracle dependencies in core logic
 
@@ -382,13 +425,13 @@ The Foundation is temporary by design. As the public community becomes sufficien
 
 | Contract | Address |
 |----------|---------|
-| ProtocolDefenseConsensus (PDC) | `0x2c56CA0f4FcBbdBdF634bB6d77dCAD314e15b349` |
-| BTCReserveVault | `0x02A2cC006FB2F0b4B59Dd30EA6613eE2BA84942E` |
-| EmissionScheduler | `0x23F2f1dfE875ec1192d0b003185340509693eBcB` |
-| MintDistributor | `0x08EBc0cE45eC551f0Ad3584538A0DF287F169b5c` |
-| DMDToken | `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f` |
-| RedemptionEngine | `0x70538c1067199834807d00BBCBE81246b305eB51` |
-| VestingContract | `0xE09885C0ba03cdB1DADA52F1D7b41772c3144c32` |
+| ProtocolDefenseConsensus (PDC) | `0x881752EB314E3E562b411a6EF92f12f0f6B895Ee` |
+| BTCReserveVault | `0x4eFDA2509fc24dCCf6Bc82f679463996993B2b4a` |
+| EmissionScheduler | `0xB9669c647cC6f753a8a9825F54778f3f172c4017` |
+| MintDistributor | `0xcccD12bCb557FCE8a9e23ECFAd178Ecc663058Da` |
+| DMDToken | `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8` |
+| RedemptionEngine | `0xF86d34387A8bE42e4301C3500C467A57F0358204` |
+| VestingContract | `0xFcef2017590A4cF73E457535A4077e606dA2Cd9A` |
 | tBTC (External) | `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b` |
 
 ---
@@ -443,7 +486,7 @@ DMD Protocol introduces a new monetary primitive:
 
 EDAD converts human behavior into an on-chain deflation engine.
 
-This is not yield farming.  
+This is not yield farming.
 This is **programmable scarcity**.
 
 ---
@@ -456,7 +499,41 @@ Open-source code remains freely usable; the economic mechanism is protected from
 
 ---
 
-**END OF WHITEPAPER**  
-**DMD Protocol v1.8.8**  
-**Base Mainnet**  
-**December 2025**
+## 16. APPENDIX: VERSION 1.8.8 CHANGES
+
+### 16.1 Simplified Claiming System
+
+**Previous (v1.8.8):**
+- Users required to call `snapshotMyWeight()` before claiming
+- `registerUserFirstLock()` needed for eligibility tracking
+- Multiple transactions required to claim DMD
+
+**Current (v1.8.8):**
+- Single-transaction claiming via `claimAll()`
+- No snapshot or registration required
+- 10-day vesting period provides sufficient late-joiner attack protection
+- Simpler UX with reduced gas costs
+
+### 16.2 PDC Activation Simplified
+
+**Previous (v1.8.8):**
+- Required 3 conditions: 3-year time lock + 30% supply + 10k holders
+
+**Current (v1.8.8):**
+- Required 2 conditions: 30% supply + 10k holders
+- Removed arbitrary time lock
+- Enables governance when true decentralization is achieved
+
+### 16.3 Gas Optimizations
+
+- Removed unused error definitions (`EpochNotFinalized`, `UserNotEligible`)
+- Removed redundant `_isHolder` mapping in DMDToken
+- Removed legacy `updateVestedWeightCache(uint256, uint256)` function
+- Removed `getNextEpochToFinalize()` (redundant with public variable)
+
+---
+
+**END OF WHITEPAPER**
+**DMD Protocol v1.8.8**
+**Base Mainnet**
+**January 2026**
