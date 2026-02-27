@@ -499,40 +499,6 @@ Open-source code remains freely usable; the economic mechanism is protected from
 
 ---
 
-## 16. APPENDIX: VERSION 1.8.8 CHANGES
-
-### 16.1 Simplified Claiming System
-
-**Previous (v1.8.8):**
-- Users required to call `snapshotMyWeight()` before claiming
-- `registerUserFirstLock()` needed for eligibility tracking
-- Multiple transactions required to claim DMD
-
-**Current (v1.8.8):**
-- Single-transaction claiming via `claimAll()`
-- No snapshot or registration required
-- 10-day vesting period provides sufficient late-joiner attack protection
-- Simpler UX with reduced gas costs
-
-### 16.2 PDC Activation Simplified
-
-**Previous (v1.8.8):**
-- Required 3 conditions: 3-year time lock + 30% supply + 10k holders
-
-**Current (v1.8.8):**
-- Required 2 conditions: 30% supply + 10k holders
-- Removed arbitrary time lock
-- Enables governance when true decentralization is achieved
-
-### 16.3 Gas Optimizations
-
-- Removed unused error definitions (`EpochNotFinalized`, `UserNotEligible`)
-- Removed redundant `_isHolder` mapping in DMDToken
-- Removed legacy `updateVestedWeightCache(uint256, uint256)` function
-- Removed `getNextEpochToFinalize()` (redundant with public variable)
-
----
-
 **END OF WHITEPAPER**
 **DMD Protocol v1.8.8**
 **Base Mainnet**
