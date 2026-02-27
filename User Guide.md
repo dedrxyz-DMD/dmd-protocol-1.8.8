@@ -152,7 +152,7 @@ Before locking, you must approve the BTCReserveVault contract to spend your tBTC
 5. **MetaMask will pop up** - confirm the approval transaction
 6. Wait for confirmation (usually 1-5 seconds on Base)
 
-**BTCReserveVault Address**: `0x02A2cC006FB2F0b4B59Dd30EA6613eE2BA84942E`
+**BTCReserveVault Address**: `0x4eFDA2509fc24dCCf6Bc82f679463996993B2b4a`
 
 ### Step 3: Lock Your tBTC
 
@@ -210,7 +210,7 @@ To see your DMD balance:
 
 1. Open MetaMask
 2. Click "Assets" → "Import tokens"
-3. Enter DMD contract: `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f`
+3. Enter DMD contract: `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8`
 4. Click "Add custom token"
 5. Your DMD balance will now be visible
 
@@ -218,7 +218,7 @@ To see your DMD balance:
 - **Name**: DMD Protocol
 - **Symbol**: DMD
 - **Decimals**: 18
-- **Contract**: `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f`
+- **Contract**: `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8`
 
 ---
 
@@ -253,7 +253,7 @@ Before redeeming:
 3. This allows the RedemptionEngine to burn your DMD
 4. Wait for confirmation
 
-**RedemptionEngine Address**: `0x70538c1067199834807d00BBCBE81246b305eB51`
+**RedemptionEngine Address**: `0xF86d34387A8bE42e4301C3500C467A57F0358204`
 
 ### Step 4: Burn DMD and Redeem tBTC
 
@@ -512,7 +512,7 @@ Ask yourself:
 **Problem**: Claimed DMD but don't see it
 **Solution**:
 - Add DMD token to MetaMask manually
-- Contract: `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f`
+- Contract: `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8`
 - Symbol: DMD, Decimals: 18
 
 ### "Can't Connect to Base Network"
@@ -541,10 +541,10 @@ For verification and direct contract interaction:
 
 | Contract | Address |
 |----------|---------|
-| **BTCReserveVault** | `0x02A2cC006FB2F0b4B59Dd30EA6613eE2BA84942E` |
-| **DMDToken** | `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f` |
-| **RedemptionEngine** | `0x70538c1067199834807d00BBCBE81246b305eB51` |
-| **MintDistributor** | `0x08EBc0cE45eC551f0Ad3584538A0DF287F169b5c` |
+| **BTCReserveVault** | `0x4eFDA2509fc24dCCf6Bc82f679463996993B2b4a` |
+| **DMDToken** | `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8` |
+| **RedemptionEngine** | `0xF86d34387A8bE42e4301C3500C467A57F0358204` |
+| **MintDistributor** | `0xcccD12bCb557FCE8a9e23ECFAd178Ecc663058Da` |
 | **tBTC (External)** | `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b` |
 
 **Verify on BaseScan**: [basescan.org](https://basescan.org)
