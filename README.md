@@ -28,7 +28,7 @@ There are **no upgrades, no admin keys, no governance, and no emergency controls
 
 - **Reserve-Locked Minting**: DMD is minted only via tBTC locking
 - **Fixed Emissions**: Annual emissions decay by 25%, independent of deposits
-- **Mandatory Full Burn-to- Redeem**: No partial unlocks, no alternative exits
+- **Mandatory Full Burn-to-Redeem**: No partial unlocks, no alternative exits
 - **Market-Driven Deflation**: User redemption behavior determines supply collapse
 - **Permanent Supply Reduction**: Burned DMD can never be reminted
 
@@ -41,6 +41,7 @@ There are **no upgrades, no admin keys, no governance, and no emergency controls
 - **Flash Loan Resistance**: 10-day weight vesting period
 - **Time-Weighted Participation**: Lock multipliers up to 1.48× (24 months)
 - **Deflationary Tokenomics**: 18M max supply, 14.4M emission cap
+- **Single-Transaction Claims**: No snapshots required, claim DMD in one transaction
 - **Audit-Grade**: 160 comprehensive tests, all passing
 
 ---
@@ -72,24 +73,24 @@ All non-emission allocations (Foundation, Founders, Developers, Contributors) fo
 
 - **BTCReserveVault.sol** — tBTC locking, positions, weight tracking (checks PDC)
 - **EmissionScheduler.sol** — Fixed annual emissions with 25% decay
-- **MintDistributor.sol** — 7-day epoch-based distribution
+- **MintDistributor.sol** — 7-day epoch-based distribution, single-transaction claims
 - **RedemptionEngine.sol** — Enforces full burn-to-redeem
 - **DMDToken.sol** — ERC-20 with capped supply and public burn
 - **VestingContract.sol** — Long-term team & contributor vesting
-- **ProtocolDefenseConsensus.sol** — Adapter-only (PDC)
+- **ProtocolDefenseConsensus.sol** — Adapter-only governance (PDC)
 
 ### Deployed Contracts (Base Mainnet)
 
 | Contract | Address |
 |----------|---------|
 
-| BTCReserveVault | `0x02A2cC006FB2F0b4B59Dd30EA6613eE2BA84942E` |
-| EmissionScheduler | `0x23F2f1dfE875ec1192d0b003185340509693eBcB` |
-| MintDistributor | `0x08EBc0cE45eC551f0Ad3584538A0DF287F169b5c` |
-| DMDToken | `0x2b795f885Ccf84090c6DaFd2d03Fc03807A0625f` |
-| RedemptionEngine | `0x70538c1067199834807d00BBCBE81246b305eB51` |
-| VestingContract | `0xE09885C0ba03cdB1DADA52F1D7b41772c3144c32` |
-| ProtocolDefenseConsensus (PDC) | `0x2c56CA0f4FcBbdBdF634bB6d77dCAD314e15b349` |
+| BTCReserveVault | `0x4eFDA2509fc24dCCf6Bc82f679463996993B2b4a` |
+| EmissionScheduler | `0xB9669c647cC6f753a8a9825F54778f3f172c4017` |
+| MintDistributor | `0xcccD12bCb557FCE8a9e23ECFAd178Ecc663058Da` |
+| DMDToken | `0xc41848d1548a16F87C7e61296A8d2Dc6e9cb07E8` |
+| RedemptionEngine | `0xF86d34387A8bE42e4301C3500C467A57F0358204` |
+| VestingContract | `0xFcef2017590A4cF73E457535A4077e606dA2Cd9A` |
+| ProtocolDefenseConsensus (PDC) | `0x881752EB314E3E562b411a6EF92f12f0f6B895Ee` |
 | tBTC (External) | `0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b` |
 
 ---
@@ -113,12 +114,11 @@ PDC is a **minimal voting system** that exists **ONLY** to manage external tBTC 
 
 ### Activation Conditions
 
-PDC is **completely inert** until ALL conditions are met:
+PDC is **completely inert** until BOTH conditions are met:
 
 | Condition | Threshold |
 |-----------|-----------|
-| Time Since Deployment | ≥ 3 years |
-| Circulating Supply | ≥ 30% of MAX_SUPPLY |
+| Circulating Supply | ≥ 30% of MAX_SUPPLY (5.4M DMD) |
 | Unique Holders | ≥ 10,000 addresses |
 
 ### Voting Parameters
@@ -165,7 +165,7 @@ Can cancel anytime with `cancelEarlyUnlock(positionId)` to restore weight.
 
 ### Flash Loan Protection
 
-- Days 0–7: 0% weight (epoch delay)
+- Days 0–7: 0% weight (warmup period)
 - Days 7–10: Linear vesting (0% → 100%)
 - Day 10+: Full weight active
 
@@ -186,6 +186,25 @@ Can cancel anytime with `cancelEarlyUnlock(positionId)` to restore weight.
 - Supply invariants verified
 
 Security posture: **A+**
+
+---
+
+## Version 1.8.8 Changes
+
+### Simplified Claiming (No Snapshots)
+- Removed snapshot requirement for claiming DMD
+- Users can now claim all epochs in a single transaction
+- 10-day vesting period provides sufficient late-joiner attack protection
+
+### PDC Activation Simplified
+- Removed 3-year time lock requirement
+- Activation now based on supply (30%) + holders (10k) only
+- Enables faster community governance when decentralization is achieved
+
+### Gas Optimizations
+- Removed unused error definitions
+- Removed redundant storage mappings in DMDToken
+- Removed legacy function signatures
 
 ---
 
